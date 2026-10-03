@@ -1,0 +1,7 @@
+Message-ID: <firebase@example.com>
+From: Firebase <noreply@firebaseapp.com>
+To: user@sutemail.test
+Subject: Verify your email
+Content-Type: text/plain; charset=utf-8
+
+Verify: https://example.firebaseapp.com/action?mode=verifyEmail&oobCode=abc123

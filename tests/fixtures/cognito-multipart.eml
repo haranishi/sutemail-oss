@@ -1,0 +1,15 @@
+Message-ID: <cognito@example.com>
+From: AWS <noreply@aws.amazon.com>
+To: user@sutemail.test
+Subject: Authentication code
+Content-Type: multipart/alternative; boundary="alt"
+
+--alt
+Content-Type: text/plain; charset=utf-8
+
+Authentication code: 640218
+--alt
+Content-Type: text/html; charset=utf-8
+
+<p>Authentication code: <strong>640218</strong></p>
+--alt--

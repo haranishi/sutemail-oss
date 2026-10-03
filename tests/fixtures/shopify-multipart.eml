@@ -1,0 +1,15 @@
+Message-ID: <shopify@example.com>
+From: Shopify <no-reply@shopify.com>
+To: user@sutemail.test
+Subject: Login code
+Content-Type: multipart/alternative; boundary="shop"
+
+--shop
+Content-Type: text/plain; charset=utf-8
+
+847205
+--shop
+Content-Type: text/html; charset=utf-8
+
+<p>847205</p>
+--shop--

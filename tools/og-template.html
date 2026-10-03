@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <title>捨てメール（仮）OGP原稿</title>
+    <!--
+      OGP画像（1200×630）の原稿。tools/assets.mjs が 1200×630 のビューポートで開いて PNG にする。
+
+      決めたこと:
+      - 焼き込む文字は製品名「捨てメール（仮）」と1行の説明だけ。URL・機能・煽り文句を足さない
+      - 色・角丸・影・フォントは docs/02_ux_design.md ⑤表層と public/app.css に合わせる。
+        アクセントは #2f6ae0 の1色だけで、赤緑に意味を持たせない
+      - 外部フォントを読まない。日本語はシステムフォント（macOS では Hiragino Sans）に任せる
+      - prefers-color-scheme で切り替えない。共有先のサムネは1枚しか持てないのでライト固定
+      - 左のマークは tools/icon-template.html と同じ図形。こちらは単体で置くので角を丸める
+        （アイコン側は iOS のマスクに任せるため角丸にしない）。図形を共有すると file:// での
+        読み込みが環境依存になるため、意図して同じ SVG を書き写している
+    -->
+    <style>
+      html, body { margin: 0; padding: 0; }
+      body {
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background: #f6f7f9;
+        color: #1c1f26;
+        font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* 中央に縦積み。左右に置くと 1200×630 の下半分が丸ごと空き、
+         タイムラインで縮んだときに文字が小さいわりに余白だけが目立つ */
+      .card {
+        position: absolute;
+        inset: 48px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 56px;
+        text-align: center;
+        background: #ffffff;
+        border: 1px solid #dfe3ea;
+        border-radius: 28px;
+        box-shadow: 0 2px 8px rgba(20, 26, 38, 0.08);
+      }
+
+      /* 上辺のアクセント帯。文字を足さずに製品の色を1本だけ通す */
+      .card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 10px;
+        background: #2f6ae0;
+      }
+
+      .mark { flex: none; display: block; width: 160px; height: 160px; }
+
+      .name {
+        margin: 32px 0 0;
+        font-size: 84px;
+        font-weight: 700;
+        line-height: 1.2;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+      }
+
+      .tag {
+        margin: 16px 0 0;
+        font-size: 38px;
+        line-height: 1.4;
+        color: #5b6472;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <svg class="mark" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="512" height="512" rx="112" fill="#2f6ae0"/>
+        <rect x="96" y="104" width="320" height="216" rx="26" fill="#ffffff"/>
+        <path d="M126 138 L256 232 L386 138" fill="none" stroke="#2f6ae0"
+              stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+        <g fill="#ffffff">
+          <rect x="96" y="362" width="58" height="44" rx="22"/>
+          <rect x="170" y="362" width="86" height="44" rx="22"/>
+          <rect x="272" y="362" width="58" height="44" rx="22"/>
+          <rect x="346" y="362" width="70" height="44" rx="22"/>
+        </g>
+      </svg>
+      <p class="name">捨てメール（仮）</p>
+      <p class="tag">認証コードだけ受け取る使い捨てメール</p>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,7 @@
+Message-ID: <slack@example.com>
+From: Slack <feedback@slack.com>
+To: user@sutemail.test
+Subject: Your code
+Content-Type: text/html; charset=utf-8
+
+<p>Your code is <b>385104</b></p>

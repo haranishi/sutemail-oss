@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sutemail",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    // 全リクエストを Worker に通す。静的アセットの応答へ CSP を載せるため（I-7・src/lib/headers.ts）。
+    // `public/_headers` は廃止した（Turnstile を入れたとき CSP の差し替えを忘れると発行が全部 403 になる事故を無くす）
+    "run_worker_first": true
+  },
+  "kv_namespaces": [
+    { "binding": "INBOX", "id": "REPLACE_WITH_KV_ID_ON_DEPLOY" }
+  ],
+  "vars": {
+    "MAIL_DOMAIN": "sutemail.test",
+    "APP_ORIGIN": "http://127.0.0.1:8788",
+    "ADDRESS_TTL_SECONDS": "600",
+    "MESSAGE_TTL_SECONDS": "600",
+    "ISSUE_LIMIT_PER_HOUR": "10",
+    "MAX_RAW_BYTES": "262144"
+  }
+}

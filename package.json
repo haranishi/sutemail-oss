@@ -1,0 +1,26 @@
+{
+  "name": "sutemail",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "WRANGLER_SEND_METRICS=false WRANGLER_LOG_PATH=.wrangler/logs WRANGLER_REGISTRY_PATH=.wrangler/registry wrangler dev --port 8788",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "WRANGLER_SEND_METRICS=false WRANGLER_LOG_PATH=.wrangler/logs vitest run",
+    "test:e2e": "playwright test",
+    "test": "npm run typecheck && npm run test:unit && npm run test:e2e",
+    "build": "WRANGLER_SEND_METRICS=false WRANGLER_LOG_PATH=.wrangler/logs wrangler deploy --dry-run --outdir dist"
+  },
+  "dependencies": {
+    "@block65/webcrypto-web-push": "^2.0.0",
+    "postal-mime": "3.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.12.14",
+    "@cloudflare/workers-types": "5.20260905.1",
+    "@playwright/test": "1.63.0",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4",
+    "wrangler": "4.129.0"
+  }
+}

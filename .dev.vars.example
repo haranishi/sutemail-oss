@@ -1,0 +1,11 @@
+IP_HASH_SECRET=dev-secret
+DEV_INJECT=1
+
+# 任意。3つ揃ったときだけ Web Push が有効になる（VAPID鍵の作り方は docs/DEPLOY.md）
+# VAPID_SUBJECT=mailto:you@example.com
+# VAPID_PUBLIC_KEY=
+# VAPID_PRIVATE_KEY=
+
+# 任意。2つ揃ったときだけ Turnstile 検証が有効になる
+# TURNSTILE_SITE_KEY=
+# TURNSTILE_SECRET_KEY=

@@ -1,0 +1,13 @@
+Message-ID: <false-positive@example.com>
+From: Shop <shop@example.com>
+To: user@sutemail.test
+Subject: ご利用明細
+Content-Type: text/plain; charset=utf-8
+
+電話 03-1234-5678
+郵便番号 〒123-4567
+合計 ¥12,800
+注文番号 7654321
+日付 2026/09/05 12:34
+接続元 192.168.10.20
+URL https://example.com/order/998877

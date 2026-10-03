@@ -1,0 +1,7 @@
+Message-ID: <auth0@example.com>
+From: Auth0 <noreply@auth0.com>
+To: user@sutemail.test
+Subject: Login code
+Content-Type: text/html; charset=utf-8
+
+<html><body><style>.x{width:123456px}</style><p>Login code</p><div>731905</div></body></html>

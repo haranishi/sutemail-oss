@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>捨てメール（仮）— 認証コードだけ受け取る使い捨てメール</title>
+    <meta name="description" content="初めて使うサービスに本物のアドレスを渡さずに済む使い捨てメール。1タップで発行し、届いた認証コードを大きく表示します。10分で自動的に消えます。">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f1217" media="(prefers-color-scheme: dark)">
+
+    <!-- 公開URLは本人がデプロイ時に置換する（docs/DEPLOY.md の手順。ビルド時差し込みはしない） -->
+    <link rel="canonical" href="https://REPLACE_APP_ORIGIN/">
+    <meta name="share:text" content="捨てメール（仮）— 認証コードだけ受け取る使い捨てメール">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="捨てメール（仮）">
+    <meta property="og:title" content="捨てメール（仮）— 認証コードだけ受け取る使い捨てメール">
+    <meta property="og:description" content="本物のアドレスを渡さずに、認証コードだけ受け取る使い捨てメール。1タップで発行、10分で消えます。">
+    <meta property="og:image" content="https://REPLACE_APP_ORIGIN/og.png">
+    <meta property="og:url" content="https://REPLACE_APP_ORIGIN/">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" href="/icons/icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="stylesheet" href="/app.css">
+    <link rel="stylesheet" href="/shared/share.css">
+    <script src="/app.js" type="module"></script>
+    <script src="/shared/share.js" defer></script>
+  </head>
+  <body>
+    <div class="page">
+      <header class="masthead">
+        <h1 class="masthead__name">捨てメール（仮）</h1>
+        <p class="masthead__tag">認証コードだけ受け取る使い捨てメール</p>
+      </header>
+
+      <!-- app.js が状態（idle / waiting / received / expired）ごとに中身を描き直す -->
+      <main id="app" data-state="loading" aria-busy="true">
+        <p class="lede">読み込んでいます…</p>
+        <noscript>
+          <p class="notice">この画面はJavaScriptで動きます。有効にしてから読み込み直してください。</p>
+        </noscript>
+      </main>
+
+      <!-- 報告欄（FR-18）。中身は app.js が1度だけ組み立て、待受・受信のときだけ出す -->
+      <section id="report" class="card" hidden aria-label="届いた・届かなかったの報告"></section>
+
+      <section class="promise" aria-label="このサービスがしないこと">
+        <h2 class="promise__title">このサービスがしないこと</h2>
+        <ul class="promise__list">
+          <li>メールを送信しません（受信専用です）</li>
+          <li>本文を保存し続けません（最長10分で自動的に消えます）</li>
+          <li>外部に通信しません（解析・広告・Cookieを持ちません）</li>
+        </ul>
+      </section>
+
+      <!-- 最近の実績（FR-18）。未発行・期限切れのときだけ出す -->
+      <section id="stats" class="stats" hidden aria-label="最近の実績"></section>
+
+      <footer class="footer">
+        <nav class="footer__nav" aria-label="規約と方針">
+          <a href="/terms">利用規約</a>
+          <a href="/privacy">プライバシー</a>
+          <a href="/external-transmission">外部送信について</a>
+        </nav>
+        <div id="share"></div>
+      </footer>
+    </div>
+
+    <p id="announce" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </body>
+</html>

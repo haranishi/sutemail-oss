@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>プライバシーポリシー｜捨てメール（仮）</title>
+    <meta name="description" content="捨てメール（仮）が取得する情報、その目的と保存期間。Cookieも解析も使いません。">
+    <meta name="robots" content="index, follow">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f1217" media="(prefers-color-scheme: dark)">
+    <link rel="icon" href="/icons/icon-192.png" type="image/png">
+    <link rel="stylesheet" href="/app.css">
+  </head>
+  <body>
+    <div class="page">
+      <header class="masthead">
+        <a class="masthead__name" href="/">捨てメール（仮）</a>
+        <p class="masthead__tag">認証コードだけ受け取る使い捨てメール</p>
+      </header>
+
+      <main class="doc">
+        <h1>プライバシーポリシー</h1>
+        <p class="doc__updated">最終改定: 2026-09-05（公開前に運営者が【要記入】を埋めます）</p>
+        <h2>1. 基本の方針</h2>
+        <p>本サービスは、利用者を識別するための仕組みを持ちません。アカウント登録はなく、Cookieも使わず、アクセス解析や広告のスクリプトも入れていません。</p>
+
+        <h2>2. 取得する情報と保存期間</h2>
+        <p>取得するのは次の5つだけです。氏名・メールアドレス（本物のほう）・電話番号は、そもそも入力する欄がありません。</p>
+        <div class="doc__scroll">
+          <table class="doc__table">
+            <thead>
+              <tr>
+                <th scope="col">取得する情報</th>
+                <th scope="col">中身</th>
+                <th scope="col">保存期間</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">発行したアドレス</th>
+                <td data-label="中身">ローカル部、発行時刻、失効時刻、認証用トークンのハッシュ値、報告済みサイトのホスト名（同じサイトを二度数えないため）、通知を送った回数</td>
+                <td data-label="保存期間">発行から最長10分</td>
+              </tr>
+              <tr>
+                <th scope="row">受信したメールの一部</th>
+                <td data-label="中身">送信元アドレス、件名、文字に直した本文（20,000字まで）、抽出した認証コードとリンク。あわせて、受け取ったメールの索引（保管場所と受信時刻）を持ちます</td>
+                <td data-label="保存期間">最長10分（アドレスの残り時間が短いときはそれに合わせます）</td>
+              </tr>
+              <tr>
+                <th scope="row">IPアドレスのハッシュ値</th>
+                <td data-label="中身">秘密鍵付きのハッシュ（HMAC-SHA-256）と、直近の発行時刻。元のIPアドレスは保存しません</td>
+                <td data-label="保存期間">1時間</td>
+              </tr>
+              <tr>
+                <th scope="row">通知の購読情報</th>
+                <td data-label="中身">ブラウザが発行する通知の宛先（Push サービスのURL）と暗号鍵。通知をオンにしたときだけ</td>
+                <td data-label="保存期間">そのアドレスが失効するまで（最長10分）</td>
+              </tr>
+              <tr>
+                <th scope="row">届いた・届かなかったの報告</th>
+                <td data-label="中身">利用者が入力したサイトのホスト名と、届いた／届かなかったの件数だけ。個人を識別する情報は含みません</td>
+                <td data-label="保存期間"><strong>期限なし</strong>（集計値として残します）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>HTMLの原文と添付ファイルは保存しません。受信したメールの中のリンクを、運営者側で開くこともありません。</p>
+        <p>このほかに、利用者の端末の中（ブラウザの localStorage）へ次を保存します。サーバーへは送られません。</p>
+        <ul>
+          <li>発行中のアドレス1件分（ローカル部・認証用トークン・失効時刻）</li>
+          <li>報告済みのサイトのホスト名（同じサイトを二重に報告しないため）</li>
+        </ul>
+
+        <h2>3. 利用目的</h2>
+        <ul>
+          <li>発行したアドレス宛のメールを、利用者本人の画面に表示するため</li>
+          <li>発行回数の上限を守り、悪用と費用の暴走を防ぐため</li>
+          <li>届く・届かないの実績を集計し、画面に表示するため</li>
+        </ul>
+
+        <h2>4. 消えるタイミング</h2>
+        <p>上の表のうち、報告の集計を除くすべては、期限が来ると自動的に消えます。画面から「新しいアドレス」を選んだ場合や、アドレスを削除した場合は、その時点で消えます。報告の集計はホスト名と件数だけの数字で、誰が報告したかは残しません。</p>
+
+        <h2>5. 第三者提供</h2>
+        <p>取得した情報を第三者へ提供・販売することはありません。法令に基づく開示請求があった場合を除きます（ただし保存期間が短いため、請求時点で残っていないことがほとんどです）。</p>
+
+        <h2>6. 外部への送信</h2>
+        <p>既定では、利用者の情報を外部のサービスへ送信しません。通知機能などを有効にした場合の送信先は、<a href="/external-transmission">外部送信について</a>に一覧で書いています。</p>
+
+        <h2>7. 開示・削除の求め</h2>
+        <p>アドレス・本文・IPアドレスのハッシュ値は保存期間が最長でも1時間のため、開示や訂正の求めに応じられないことがあります。今すぐ消したい場合は、画面で「新しいアドレス」を選ぶか、ブラウザを閉じてから10分お待ちください。報告の集計は期限なしで残りますが、ホスト名と件数だけで個人を識別できないため、特定の報告を取り消すことはできません。個別のご相談は下記の窓口へお願いします。</p>
+
+        <h2>運営者</h2>
+        <ul>
+          <li>氏名（個人事業主）: <span class="doc__fill">【要記入】</span></li>
+          <li>所在地: <span class="doc__fill">【要記入】</span></li>
+          <li>連絡・通報の窓口: <span class="doc__fill">【要記入】</span>（メール）</li>
+        </ul>
+        <p>通報・削除の依頼・不具合の連絡は、この窓口で受け付けます。迷惑メールの踏み台として使われている等の申し立てには、確認のうえ該当アドレスを失効させるなどの対応をとります。</p>
+      </main>
+
+      <footer class="footer">
+        <nav class="footer__nav" aria-label="規約と方針">
+          <a href="/terms">利用規約</a>
+          <a href="/privacy">プライバシー</a>
+          <a href="/external-transmission">外部送信について</a>
+          <a href="/">トップへ戻る</a>
+        </nav>
+      </footer>
+    </div>
+  </body>
+</html>

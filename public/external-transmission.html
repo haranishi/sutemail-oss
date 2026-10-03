@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>外部送信について｜捨てメール（仮）</title>
+    <meta name="description" content="捨てメール（仮）が外部に情報を送る場合の一覧。既定では送信しません。">
+    <meta name="robots" content="index, follow">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f1217" media="(prefers-color-scheme: dark)">
+    <link rel="icon" href="/icons/icon-192.png" type="image/png">
+    <link rel="stylesheet" href="/app.css">
+  </head>
+  <body>
+    <div class="page">
+      <header class="masthead">
+        <a class="masthead__name" href="/">捨てメール（仮）</a>
+        <p class="masthead__tag">認証コードだけ受け取る使い捨てメール</p>
+      </header>
+
+      <main class="doc">
+        <h1>外部送信について</h1>
+        <p class="doc__updated">最終改定: 2026-09-05（公開前に運営者が【要記入】を埋めます）</p>
+        <h2>結論</h2>
+        <p><strong>既定では、外部に一切送信しません。</strong>アクセス解析、広告、第三者のスクリプト、Cookie、外部フォント、CDNのいずれも使っていません。画面が通信するのは、このサイト自身のAPIだけです。</p>
+
+        <h2>例外は2つだけ</h2>
+        <h3>1. 通知を有効にしたとき</h3>
+        <ul>
+          <li><strong>送信先</strong>: 利用者のブラウザが指定する Push サービス（Apple、Google、Mozilla のいずれか。どこになるかは利用者のブラウザが決めます）</li>
+          <li><strong>送信する情報</strong>: 暗号化した通知の本文。中身は「認証コードが届きました」という知らせだけで、<strong>認証コードそのものは含みません</strong>（ロック画面に出てしまうため）</li>
+          <li><strong>タイミング</strong>: 利用者が通知を許可したうえで、そのアドレスにメールが届いたとき</li>
+          <li><strong>止め方</strong>: 画面で通知をオフにするか、ブラウザの通知設定から許可を取り消してください</li>
+          <li><strong>手元に残るもの</strong>: 通知の宛先（Push サービスのURL）と暗号鍵を、そのアドレスが失効するまで預かります（<a href="/privacy">プライバシーポリシー</a>の表を参照）</li>
+        </ul>
+
+        <h3>2. 自動発行の防止（Turnstile）を有効にしたとき</h3>
+        <ul>
+          <li><strong>送信先</strong>: challenges.cloudflare.com（Cloudflare Turnstile）</li>
+          <li><strong>送信する情報</strong>: 判定用のトークン、IPアドレス、ブラウザの種類など、Turnstile が人間かどうかを判定するために取得する情報</li>
+          <li><strong>タイミング</strong>: アドレスを発行するとき</li>
+          <li><strong>止め方</strong>: この仕組みは発行の条件のため、個別に止めることはできません。有効になっている場合は、発行画面にウィジェットが表示されます</li>
+        </ul>
+        <p>この2つが有効かどうかは、そのときの設定によります。有効でない場合、上記の通信は一切発生しません。</p>
+
+        <h2>「届いた・届かなかった」の報告について</h2>
+        <p>画面から送る報告は、<strong>このサイト自身のAPIにだけ</strong>送られます。外部のサービスへは出ません。送るのは利用者が入力したサイトのホスト名と、届いた／届かなかったの別だけで、個人を識別する情報は含みません。集計として何が残るかは<a href="/privacy">プライバシーポリシー</a>の表に書いています。</p>
+
+        <h2>メールの中のリンクについて</h2>
+        <p>受信したメールにリンクが含まれていても、運営者側でそのリンクを開くことはありません（先読みで認証リンクが使い切られる事故を避けるためです）。リンクが開かれるのは、利用者が画面の「開く」を押したときだけで、その通信は利用者のブラウザとリンク先の間で直接行われます。</p>
+
+        <h2>サーバーの所在</h2>
+        <p>本サービスは Cloudflare Workers 上で動きます。メールの受信と保存は Cloudflare のネットワーク内で行われ、保存先は暗号化されたキーバリューストア（Cloudflare KV）です。処理が行われる国は Cloudflare のネットワークにより変わります。</p>
+
+        <h2>運営者</h2>
+        <ul>
+          <li>氏名（個人事業主）: <span class="doc__fill">【要記入】</span></li>
+          <li>所在地: <span class="doc__fill">【要記入】</span></li>
+          <li>連絡・通報の窓口: <span class="doc__fill">【要記入】</span>（メール）</li>
+        </ul>
+        <p>通報・削除の依頼・不具合の連絡は、この窓口で受け付けます。迷惑メールの踏み台として使われている等の申し立てには、確認のうえ該当アドレスを失効させるなどの対応をとります。</p>
+      </main>
+
+      <footer class="footer">
+        <nav class="footer__nav" aria-label="規約と方針">
+          <a href="/terms">利用規約</a>
+          <a href="/privacy">プライバシー</a>
+          <a href="/external-transmission">外部送信について</a>
+          <a href="/">トップへ戻る</a>
+        </nav>
+      </footer>
+    </div>
+  </body>
+</html>

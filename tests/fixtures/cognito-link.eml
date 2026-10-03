@@ -1,0 +1,7 @@
+Message-ID: <cognito-link@example.com>
+From: AWS <noreply@aws.amazon.com>
+To: user@sutemail.test
+Subject: Confirm your email
+Content-Type: text/plain; charset=utf-8
+
+https://example.com/confirm?confirmation_code=secret

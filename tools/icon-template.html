@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <title>捨てメール（仮）アイコン原稿</title>
+    <!--
+      PWA アイコン（192／512）と apple-touch-icon（180）の原稿。tools/assets.mjs が
+      ビューポートを一辺のピクセル数に合わせて開き、そのまま PNG にする。
+      図形は viewBox 512 の SVG なので、どの辺長でも輪郭が崩れない。
+
+      決めたこと:
+      - 文字を入れない。封筒＋伏せ字にした桁（＝認証コード）の図形だけで意味を持たせる
+      - 角を丸めない。iOS は apple-touch-icon を自分でマスクするので、こちらで丸めると
+        角が透明になり、透過を嫌う環境で黒く出る。全面をアクセント色で塗る
+      - 図形は中央 80% の内側に収める（将来 maskable を宣言しても欠けない）
+      - 色は docs/02_ux_design.md ⑤表層のアクセント #2f6ae0 と白のみ
+    -->
+    <style>
+      html, body { margin: 0; padding: 0; background: #2f6ae0; }
+      body { width: 100vw; height: 100vh; overflow: hidden; }
+      svg { display: block; width: 100vw; height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect width="512" height="512" fill="#2f6ae0"/>
+      <!-- 封筒 -->
+      <rect x="96" y="104" width="320" height="216" rx="26" fill="#ffffff"/>
+      <path d="M126 138 L256 232 L386 138" fill="none" stroke="#2f6ae0"
+            stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- 認証コードの桁（伏せ字） -->
+      <g fill="#ffffff">
+        <rect x="96" y="362" width="58" height="44" rx="22"/>
+        <rect x="170" y="362" width="86" height="44" rx="22"/>
+        <rect x="272" y="362" width="58" height="44" rx="22"/>
+        <rect x="346" y="362" width="70" height="44" rx="22"/>
+      </g>
+    </svg>
+  </body>
+</html>

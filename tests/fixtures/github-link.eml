@@ -1,0 +1,7 @@
+Message-ID: <github@example.com>
+From: GitHub <noreply@github.com>
+To: user@sutemail.test
+Subject: Please verify your email
+Content-Type: text/html; charset=utf-8
+
+<html><body><a href="https://github.com/users/verify?token=secret">Verify email address</a><a href="https://github.com/privacy">Privacy</a></body></html>
