@@ -1,5 +1,5 @@
-import { createExecutionContext, env, fetchMock, waitOnExecutionContext } from "cloudflare:test";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildDeclarativePayload,
   buildNewMessageNotification,
@@ -18,6 +18,8 @@ import supabase from "../fixtures/supabase-plain.eml?raw";
 
 const baseEnv = env as unknown as Env;
 const PUSH_ORIGIN = "https://push.example.com";
+const outboundFetch = vi.fn<typeof fetch>();
+let expectedUrls: string[] = [];
 
 function base64url(bytes: Uint8Array): string {
   let binary = "";
@@ -56,15 +58,11 @@ interface CapturedRequest {
 /** 送信先を差し替えて、実際の Push サービスを叩かずにヘッダーと本文を覗く。 */
 function interceptPush(path: string, statusCode: number): CapturedRequest[] {
   const captured: CapturedRequest[] = [];
-  fetchMock
-    .get(PUSH_ORIGIN)
-    .intercept({ path, method: "POST" })
-    .reply((options) => {
-      const headers =
-        options.headers instanceof Headers ? options.headers : new Headers(options.headers as Record<string, string>);
-      captured.push({ headers, body: options.body });
-      return { statusCode };
-    });
+  expectedUrls.push(`${PUSH_ORIGIN}${path}`);
+  outboundFetch.mockImplementationOnce(async (_input, init) => {
+    captured.push({ headers: new Headers(init?.headers), body: init?.body ?? undefined });
+    return new Response(null, { status: statusCode });
+  });
   return captured;
 }
 
@@ -75,12 +73,22 @@ const payload = buildDeclarativePayload({
 });
 
 describe("push", () => {
-  beforeAll(() => {
-    fetchMock.activate();
-    fetchMock.disableNetConnect();
+  beforeEach(() => {
+    expectedUrls = [];
+    outboundFetch.mockReset().mockRejectedValue(new Error("Unexpected outbound fetch"));
+    vi.stubGlobal("fetch", outboundFetch);
   });
   afterEach(() => {
-    fetchMock.assertNoPendingInterceptors();
+    try {
+      expect(outboundFetch).toHaveBeenCalledTimes(expectedUrls.length);
+      expectedUrls.forEach((url, index) => {
+        const [input, init] = outboundFetch.mock.calls[index];
+        expect(input instanceof Request ? input.url : String(input)).toBe(url);
+        expect(init?.method ?? (input instanceof Request ? input.method : "GET")).toBe("POST");
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("Declarative Web Push の形で組み立てる", () => {

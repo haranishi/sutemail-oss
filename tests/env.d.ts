@@ -3,8 +3,8 @@ declare module "*.eml?raw" {
   export default content;
 }
 
-declare module "cloudflare:test" {
-  interface ProvidedEnv {
+declare namespace Cloudflare {
+  interface Env {
     INBOX: KVNamespace;
     ASSETS: Fetcher;
     MAIL_DOMAIN: string;
