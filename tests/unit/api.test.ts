@@ -1,5 +1,5 @@
-import { env, fetchMock, SELF } from "cloudflare:test";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { env, SELF } from "cloudflare:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { handleApi } from "../../src/handlers/api";
 import { getAddress, type AddressRecord } from "../../src/lib/store";
 import type { Env } from "../../src/types";
@@ -291,19 +291,31 @@ describe("届いた・届かなかった報告（FR-18）", () => {
 describe("Turnstile（FR-12）", () => {
   const TURNSTILE_ENV: Partial<Env> = { TURNSTILE_SITE_KEY: "site-key", TURNSTILE_SECRET_KEY: "secret-key" };
 
-  beforeAll(() => {
-    fetchMock.activate();
-    fetchMock.disableNetConnect();
-  });
-  afterAll(() => {
-    fetchMock.deactivate();
+  const outboundFetch = vi.fn<typeof fetch>();
+  let expectedUrls: string[] = [];
+
+  beforeEach(() => {
+    expectedUrls = [];
+    outboundFetch.mockReset().mockRejectedValue(new Error("Unexpected outbound fetch"));
+    vi.stubGlobal("fetch", outboundFetch);
   });
   afterEach(() => {
-    fetchMock.assertNoPendingInterceptors();
+    try {
+      // ハンドラ内の例外処理に隠れないよう、送信先と回数は呼び出し後に確認する。
+      expect(outboundFetch).toHaveBeenCalledTimes(expectedUrls.length);
+      expectedUrls.forEach((url, index) => {
+        const [input, init] = outboundFetch.mock.calls[index];
+        expect(input instanceof Request ? input.url : String(input)).toBe(url);
+        expect(init?.method ?? (input instanceof Request ? input.method : "GET")).toBe("POST");
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   function interceptSiteverify(reply: { success: boolean }): void {
-    fetchMock.get(TURNSTILE_ORIGIN).intercept({ path: TURNSTILE_PATH, method: "POST" }).reply(200, reply);
+    expectedUrls.push(`${TURNSTILE_ORIGIN}${TURNSTILE_PATH}`);
+    outboundFetch.mockResolvedValueOnce(Response.json(reply));
   }
 
   it("両方の鍵が揃ったときだけconfigにサイトキーを出す", async () => {
@@ -338,10 +350,8 @@ describe("Turnstile（FR-12）", () => {
   });
 
   it("siteverifyに届かなければ503で、発行もレート制限の消費もしない", async () => {
-    fetchMock
-      .get(TURNSTILE_ORIGIN)
-      .intercept({ path: TURNSTILE_PATH, method: "POST" })
-      .replyWithError(new Error("network down"));
+    expectedUrls.push(`${TURNSTILE_ORIGIN}${TURNSTILE_PATH}`);
+    outboundFetch.mockRejectedValueOnce(new Error("network down"));
     const response = await callApi(
       post("/api/address", { turnstileToken: "good" }, { "CF-Connecting-IP": "192.0.2.43" }),
       TURNSTILE_ENV,
