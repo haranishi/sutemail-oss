@@ -133,6 +133,12 @@ describe("メッセージ索引（I-2）", () => {
     ]);
   });
 
+  it("同時刻に ID の末尾が一致しても両方の本文を保存する", async () => {
+    const ids = ["10000000-0000-4000-8000-000000001234", "20000000-0000-4000-8000-000000001234"];
+    for (const id of ids) await putMessage(env.INBOX, local, message(id, 123), 600, 600);
+    for (const id of ids) expect((await getMessage(env.INBOX, local, id))?.text).toBe(`本文 ${id}`);
+  });
+
   it("索引に無い本文は取り出せない", async () => {
     await issue();
     await putMessage(env.INBOX, local, message("msg-0001", 1_700_000_000_000), 600, 600);

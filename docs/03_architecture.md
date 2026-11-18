@@ -35,7 +35,7 @@ tools/screenshots.mjs  390/768/1440 の状態別スクショ → .agent-harness/
 |---|---|---|
 | `addr:<local>` | `{tokenHash, createdAt, expiresAt, pushSub?, reportedHosts?, pushSent?}` | `ADDRESS_TTL_SECONDS` |
 | `idx:<local>` | `{messages:[{key, receivedAt, id}]}`（受信済みメッセージの索引） | `addr:` と同じ |
-| `msg:<local>:<receivedAtMs>-<rand4>` | `{id, from, subject, receivedAt, codes[], links[], text}` | min(アドレス残り, `MESSAGE_TTL_SECONDS`)、下限60 |
+| `msg:<local>:<receivedAtMs>-<uuid>` | `{id, from, subject, receivedAt, codes[], links[], text}` | min(アドレス残り, `MESSAGE_TTL_SECONDS`)、下限60 |
 | `rl:issue:<ipHash>` | 直近の発行時刻の配列（上限 `ISSUE_LIMIT_PER_HOUR` 件）。read-modify-write のため同時到着は素通りしうる。公開時は Turnstile を有効にすることが前提の防波堤（レビュー r2 N-3） | 3600 |
 | `stat:<host>` | `{ok, ng, updatedAt}`（同じ値を KV `metadata` にも載せ、上位10件は `list()` の各ページの metadata から選び、ホストごとの追加取得を省く） | なし（個人情報を含まない集計） |
 一覧は `idx:` の索引を受信時刻降順に並べ、本文は `get` で引く。**ポーリング経路で `list` を使わない**——3秒ごとの一覧で `kv.list` を1回ずつ走らせると、アドレス1本10分で約88回になり KV の list 無料枠を使い切るため。

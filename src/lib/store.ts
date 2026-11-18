@@ -147,7 +147,7 @@ export async function markHostReported(
 }
 
 function messageKey(local: string, message: StoredMessage): string {
-  return `msg:${local}:${message.receivedAt}-${message.id.slice(-4)}`;
+  return `msg:${local}:${message.receivedAt}-${message.id}`;
 }
 
 function indexKey(local: string): string {
