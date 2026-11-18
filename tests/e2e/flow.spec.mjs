@@ -114,6 +114,20 @@ test("2) 発行すると waiting になり、アドレスをコピーできる",
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(address);
 });
 
+test("メール到着時もキーボードで選んだアドレスのコピーを続けられる", async ({ page, request }) => {
+  const address = await issueAddress(page);
+  await page.locator("#poll-now").focus();
+  await page.keyboard.press("Tab"); // 新しいアドレス
+  await page.keyboard.press("Tab"); // アドレスのコピー
+  const copy = page.locator("#copy-address");
+  await expect(copy).toBeFocused();
+  await inject(request, address, "supabase-plain.eml", "noreply@example.test");
+  await expect(appMain(page)).toHaveAttribute("data-state", "received", { timeout: 6000 });
+  await expect(copy).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#toast")).toHaveText("コピーしました");
+});
+
 test("3) メールが届くと received になり、コードをコピーできる", async ({ page, request }) => {
   const address = await issueAddress(page);
   const injectedAt = Date.now();

@@ -1255,7 +1255,11 @@ function render(model) {
   if (model.name === "loading" && !model.error) main.setAttribute("aria-busy", "true");
   else main.removeAttribute("aria-busy");
   // viewFor は「その状態では出さない部品」を null で返すので、ここで落とす
+  // 自動更新で同じアドレスの操作ボタンからキーボードのフォーカスを奪わない。
+  const focused = document.activeElement;
+  const actionId = focused?.matches("#poll-now, #new-address, #copy-address") ? focused.id : "";
   main.replaceChildren(...viewFor(model).filter(Boolean));
+  if (actionId) document.getElementById(actionId)?.focus({ preventScroll: true });
   drawTurnstile(); // 枠を描き直したので、ウィジェットも入れ直す（サイトキーがある時だけ動く）
 }
 
