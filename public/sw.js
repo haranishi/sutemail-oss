@@ -3,7 +3,7 @@
    ・/api/* は絶対にキャッシュしない（本文は消える前提のデータなので端末に残さない）
    ・push は Declarative Web Push 非対応ブラウザ向けのフォールバック。通知本文にコードは載せない */
 
-const CACHE = "sutemail-shell-v1";
+const CACHE = "sutemail-shell-v2";
 const SHELL = [
   "/",
   "/app.css",
@@ -11,6 +11,9 @@ const SHELL = [
   "/shared/share.css",
   "/shared/share.js",
   "/manifest.webmanifest",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
+  "/apple-touch-icon.png",
   "/terms",
   "/privacy",
   "/external-transmission",
@@ -42,22 +45,23 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith("/api/")) return; // APIは素通し。キャッシュもしない
-  event.respondWith(networkFirst(request));
+  if (!SHELL.includes(url.pathname)) return;
+  event.respondWith(networkFirst(request, !url.search));
 });
 
-async function networkFirst(request) {
+async function networkFirst(request, cacheable) {
   try {
     const response = await fetch(request);
-    if (response && response.ok && response.type === "basic") {
+    if (cacheable && response.ok && response.type === "basic") {
       const cache = await caches.open(CACHE);
-      cache.put(request, response.clone());
+      await cache.put(request, response.clone()).catch(() => {});
     }
     return response;
   } catch (error) {
+    const cache = await caches.open(CACHE);
     const cached =
-      (await caches.match(request)) ||
-      (request.mode === "navigate" ? await caches.match("/") : undefined);
+      (await cache.match(request, { ignoreSearch: true })) ||
+      (request.mode === "navigate" ? await cache.match("/") : undefined);
     if (cached) return cached;
     return new Response("オフラインです。電波の届く場所で開き直してください。", {
       status: 503,

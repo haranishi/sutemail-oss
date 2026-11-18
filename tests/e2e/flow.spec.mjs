@@ -243,6 +243,19 @@ test.describe("390px（iPhone相当）", () => {
   });
 });
 
+test("シェルの URL に付いた個別のクエリ値を端末に保存しない", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+  // 実際のナビゲーションを終え、次のページから Cache Storage の鍵を読む。
+  await page.goto("/?note=sample");
+  const paths = await page.evaluate(async () => {
+    const cachesForOrigin = await caches.keys();
+    const keys = await Promise.all(cachesForOrigin.map(async (name) => (await caches.open(name)).keys()));
+    return keys.flat().map((entry) => new URL(entry.url).search);
+  });
+  expect(paths).not.toContain("?note=sample");
+});
+
 test("8) シェア欄に X・LINE・リンクコピーがある", async ({ page }) => {
   await page.goto("/");
   const share = page.locator("#share .share");
