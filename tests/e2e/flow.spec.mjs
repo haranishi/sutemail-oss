@@ -154,6 +154,26 @@ test("4) リンク方式のメールはホスト名を大きく出し、URL全�
   await expect(url).toHaveText("https://github.com/users/verify?token=secret");
 });
 
+test.describe("期限切れと一覧取得", () => {
+  test.use({ serviceWorkers: "block" });
+  test("取得中に期限が切れたら、古い一覧で画面を戻さない", async ({ page }) => {
+    await page.clock.install();
+    let answer;
+    const pending = new Promise((resolve) => { answer = resolve; });
+    await page.route("**/messages", (route) => answer(route));
+    await issueAddress(page);
+    const route = await pending;
+    await page.clock.fastForward("11:00");
+    await expect(appMain(page)).toHaveAttribute("data-state", "expired");
+    const done = page.waitForEvent("requestfinished", (request) => request.url().endsWith("/messages"));
+    await route.fulfill({ json: { messages: [] } });
+    await done;
+    // fetch と JSON の読み取りが終わったフレームで、発行操作が残っていること。
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await expect(page.locator("#reissue")).toBeVisible();
+  });
+});
+
 test("5) 期限が切れると expired になり、1タップで新しいアドレスを発行できる", async ({ page }) => {
   await page.clock.install({ time: new Date() });
   const first = await issueAddress(page);

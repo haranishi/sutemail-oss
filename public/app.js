@@ -40,6 +40,7 @@ const turnstile = { requested: false, ready: false };
 
 let lastSignature = "";
 let seenMessageIds = new Set();
+let messageRequest = 0;
 let pollTimer = null;
 let pollStartedAt = 0;
 let tickTimer = null;
@@ -271,9 +272,13 @@ async function issue() {
 }
 
 async function refreshMessages({ announceArrival = true } = {}) {
-  if (!state.address) return;
+  const address = state.address;
+  if (!address) return;
+  const request = ++messageRequest;
+  const current = () => state.address === address && request === messageRequest;
   try {
-    const response = await apiGet(`/api/address/${state.address.local}/messages`);
+    const response = await apiGet(`/api/address/${address.local}/messages`);
+    if (!current()) return;
     if (response.status === 410 || response.status === 404 || response.status === 401) {
       expire();
       return;
@@ -284,6 +289,7 @@ async function refreshMessages({ announceArrival = true } = {}) {
       return;
     }
     const data = await response.json();
+    if (!current()) return;
     const messages = Array.isArray(data.messages) ? data.messages : [];
     const arrived = messages.filter((message) => !seenMessageIds.has(message.id));
     for (const message of messages) seenMessageIds.add(message.id);
@@ -298,6 +304,7 @@ async function refreshMessages({ announceArrival = true } = {}) {
     }
     render(state);
   } catch {
+    if (!current()) return;
     // 直前の表示は残したまま「再試行」を出す（docs/02_ux_design.md ③ 分岐と復帰）
     state.error = "通信に失敗しました。";
     render(state);
