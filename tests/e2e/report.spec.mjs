@@ -107,6 +107,21 @@ test.describe("通知が有効なサーバーを装う", () => {
   // 通知ボタンの表示は Service Worker の登録結果を待たずに決まるので、判定には影響しない
   test.use({ serviceWorkers: "block" });
 
+  test("端末に以前の購読があっても新規アドレスの通知は未登録", async ({ page }) => {
+    await page.route("**/api/config", (route) => route.fulfill({
+      json: { mailDomain: "sutemail.test", addressTtlSeconds: 600, push: true },
+    }));
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator.serviceWorker, "ready", {
+        value: Promise.resolve({ pushManager: { getSubscription: async () => ({}) } }),
+      });
+    });
+    await issueAddress(page);
+    await expect(page.locator("#push-on")).toBeVisible();
+    await page.reload();
+    await expect(page.locator("#push-on")).toBeVisible();
+  });
+
   test("17) config が push:true を返すと通知ボタンが出る（購読はしない）", async ({ page }) => {
     await page.route("**/api/config", async (route) => {
       const response = await route.fetch();

@@ -255,6 +255,7 @@ async function issue() {
     state.messages = [];
     state.flashMessageId = null;
     seenMessageIds = new Set();
+    state.push = { subscribed: false, busy: false, note: "" };
     ui.openDetails.clear();
     ui.bodyTexts.clear();
     resetReport();
@@ -560,9 +561,11 @@ async function currentPushSubscription() {
 }
 
 async function refreshPushState() {
-  if (state.config?.push !== true) return;
+  const address = state.address;
+  if (state.config?.push !== true || !address) return;
   const subscription = await currentPushSubscription();
-  state.push = { ...state.push, subscribed: Boolean(subscription) };
+  if (state.address !== address) return;
+  state.push = { ...state.push, subscribed: Boolean(subscription && address.hasPushSubscription) };
   render(state);
 }
 
@@ -597,6 +600,7 @@ async function enablePush() {
       state.push.note = "通知を登録できませんでした。少し待ってからもう一度お試しください。";
       return;
     }
+    state.address.hasPushSubscription = true;
     state.push.subscribed = true;
     showToast("通知をオンにしました");
   } catch {
@@ -621,6 +625,7 @@ async function disablePush() {
         cache: "no-store",
       }).catch(() => {});
     }
+    if (state.address) state.address.hasPushSubscription = false;
     state.push.subscribed = false;
   } finally {
     state.push.busy = false;
@@ -1285,6 +1290,7 @@ async function restore(stored) {
       token: stored.token,
       expiresAt: data.expiresAt ?? stored.expiresAt,
       address: data.address,
+      hasPushSubscription: data.hasPushSubscription === true,
     };
     saveStored(state.address);
     state.name = "waiting";

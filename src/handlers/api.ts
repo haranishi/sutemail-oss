@@ -298,6 +298,7 @@ export async function handleApi(request: Request, env: Env): Promise<Response | 
       return json({
         address: `${local}@${env.MAIL_DOMAIN}`,
         expiresAt: auth.record.expiresAt,
+        hasPushSubscription: Boolean(auth.record.pushSub),
         remainingSeconds: Math.max(0, Math.ceil((auth.record.expiresAt - Date.now()) / 1000)),
         messageCount: messages.length,
       });

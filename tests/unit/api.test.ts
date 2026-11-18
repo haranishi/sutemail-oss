@@ -132,7 +132,12 @@ describe("Web Push の購読（FR-17）", () => {
       post(`/api/address/${issued.local}/push`, subscription(), auth(issued.token)),
       VAPID_ENV,
     );
+    const registration = async () => {
+      const response = await SELF.fetch(`http://example.com/api/address/${issued.local}`, { headers: auth(issued.token) });
+      return (await response.json() as { hasPushSubscription: boolean }).hasPushSubscription;
+    };
     expect(saved.status).toBe(204);
+    expect(await registration()).toBe(true);
     expect((await getAddress(env.INBOX, issued.local))?.pushSub).toEqual(subscription());
 
     const removed = await callApi(
@@ -143,6 +148,7 @@ describe("Web Push の購読（FR-17）", () => {
       VAPID_ENV,
     );
     expect(removed.status).toBe(204);
+    expect(await registration()).toBe(false);
     expect((await getAddress(env.INBOX, issued.local))?.pushSub).toBeUndefined();
   });
 
