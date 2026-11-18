@@ -75,6 +75,31 @@ test("1) idle は発行ボタンが最大の要素", async ({ page }) => {
   expect(await biggerThanHero(page)).toEqual([]);
 });
 
+test.describe("2つのタブの復元情報", () => {
+  test.use({ serviceWorkers: "block" });
+  test("古いタブの失効で別タブの新しいアドレスを消さない", async ({ page, context }) => {
+    let respond;
+    const pending = new Promise((resolve) => { respond = resolve; });
+    await page.route("**/messages", (route) => respond(route));
+    await issueAddress(page);
+    const oldPoll = await pending;
+    const second = await context.newPage();
+    await second.goto("/");
+    await expect(second.locator("#address")).toBeVisible();
+    second.once("dialog", (dialog) => dialog.accept());
+    const created = second.waitForResponse((r) => r.url().endsWith("/api/address") && r.status() === 201);
+    await second.locator("#new-address").click();
+    const { address, local } = await (await created).json();
+    await expect(second.locator("#address")).toHaveText(address);
+    // サーバーの削除・新規発行の後で、古いタブが削除済みを知る。
+    await oldPoll.fulfill({ status: 404 });
+    await expect(appMain(page)).toHaveAttribute("data-state", "expired");
+    expect(await second.evaluate(() => JSON.parse(localStorage.getItem("sutemail.v1"))?.local)).toBe(local);
+    await second.reload();
+    await expect(second.locator("#address")).toHaveText(address);
+  });
+});
+
 test("2) 発行すると waiting になり、アドレスをコピーできる", async ({ page }) => {
   const address = await issueAddress(page);
   expect(address.endsWith("@sutemail.test")).toBe(true);
@@ -87,6 +112,20 @@ test("2) 発行すると waiting になり、アドレスをコピーできる",
   await page.locator("#copy-address").click();
   await expect(page.locator("#toast")).toHaveText("コピーしました");
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(address);
+});
+
+test("メール到着時もキーボードで選んだアドレスのコピーを続けられる", async ({ page, request }) => {
+  const address = await issueAddress(page);
+  await page.locator("#poll-now").focus();
+  await page.keyboard.press("Tab"); // 新しいアドレス
+  await page.keyboard.press("Tab"); // アドレスのコピー
+  const copy = page.locator("#copy-address");
+  await expect(copy).toBeFocused();
+  await inject(request, address, "supabase-plain.eml", "noreply@example.test");
+  await expect(appMain(page)).toHaveAttribute("data-state", "received", { timeout: 6000 });
+  await expect(copy).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#toast")).toHaveText("コピーしました");
 });
 
 test("3) メールが届くと received になり、コードをコピーできる", async ({ page, request }) => {
@@ -129,6 +168,26 @@ test("4) リンク方式のメールはホスト名を大きく出し、URL全�
   await expect(url).toHaveText("https://github.com/users/verify?token=secret");
 });
 
+test.describe("期限切れと一覧取得", () => {
+  test.use({ serviceWorkers: "block" });
+  test("取得中に期限が切れたら、古い一覧で画面を戻さない", async ({ page }) => {
+    await page.clock.install();
+    let answer;
+    const pending = new Promise((resolve) => { answer = resolve; });
+    await page.route("**/messages", (route) => answer(route));
+    await issueAddress(page);
+    const route = await pending;
+    await page.clock.fastForward("11:00");
+    await expect(appMain(page)).toHaveAttribute("data-state", "expired");
+    const done = page.waitForEvent("requestfinished", (request) => request.url().endsWith("/messages"));
+    await route.fulfill({ json: { messages: [] } });
+    await done;
+    // fetch と JSON の読み取りが終わったフレームで、発行操作が残っていること。
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await expect(page.locator("#reissue")).toBeVisible();
+  });
+});
+
 test("5) 期限が切れると expired になり、1タップで新しいアドレスを発行できる", async ({ page }) => {
   await page.clock.install({ time: new Date() });
   const first = await issueAddress(page);
@@ -147,6 +206,23 @@ test("5) 期限が切れると expired になり、1タップで新しいアド�
   await expect(appMain(page)).toHaveAttribute("data-state", "waiting");
   const second = (await page.locator("#address").innerText()).trim();
   expect(second).not.toBe(first);
+});
+
+test.describe("アドレスの復元", () => {
+  test.use({ serviceWorkers: "block" });
+  for (const failure of ["503", "通信断"]) {
+    test(`復元中の${failure}から元のアドレスに戻れる`, async ({ page }) => {
+      const original = await issueAddress(page);
+      const local = original.split("@")[0];
+      await page.route(`**/api/address/${local}`, (route) =>
+        failure === "503" ? route.fulfill({ status: 503 }) : route.abort(), { times: 1 });
+      await page.reload();
+      await expect(page.getByRole("alert").or(page.locator("#reissue"))).toBeVisible();
+      expect(await page.evaluate(() => JSON.parse(localStorage.getItem("sutemail.v1"))?.local)).toBe(local);
+      await page.getByRole("button", { name: "再試行" }).click();
+      await expect(page.locator("#address")).toHaveText(original);
+    });
+  }
 });
 
 test("6) 読み込み直しても状態が戻る", async ({ page, request }) => {
@@ -181,6 +257,19 @@ test.describe("390px（iPhone相当）", () => {
   });
 });
 
+test("シェルの URL に付いた個別のクエリ値を端末に保存しない", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+  // 実際のナビゲーションを終え、次のページから Cache Storage の鍵を読む。
+  await page.goto("/?note=sample");
+  const paths = await page.evaluate(async () => {
+    const cachesForOrigin = await caches.keys();
+    const keys = await Promise.all(cachesForOrigin.map(async (name) => (await caches.open(name)).keys()));
+    return keys.flat().map((entry) => new URL(entry.url).search);
+  });
+  expect(paths).not.toContain("?note=sample");
+});
+
 test("8) シェア欄に X・LINE・リンクコピーがある", async ({ page }) => {
   await page.goto("/");
   const share = page.locator("#share .share");
@@ -199,6 +288,17 @@ const DOC_SECTIONS = {
   "/privacy": ["取得する情報", "保存期間", "第三者提供", "外部への送信"],
   "/external-transmission": ["例外は2つだけ", "メールの中のリンクについて", "サーバーの所在"],
 };
+
+test("サービスワーカーの起動で同じサイトの別アプリのキャッシュを消さない", async ({ page }) => {
+  await page.goto("/terms");
+  await page.evaluate(async () => {
+    const other = await caches.open("offline-notes");
+    await other.put("/notes", new Response("saved notes"));
+  });
+  await page.goto("/");
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+  expect(await page.evaluate(async () => (await caches.match("/notes"))?.text())).toBe("saved notes");
+});
 
 test("9) 静的3ページが開き、必要な節があり、トップへ戻れる", async ({ page }) => {
   for (const [path, sections] of Object.entries(DOC_SECTIONS)) {
@@ -221,6 +321,8 @@ test("9) 静的3ページが開き、必要な節があり、トップへ戻れ�
   }
   await page.goto("/external-transmission");
   await expect(page.locator("body")).toContainText("challenges.cloudflare.com");
+  // 通知の許可リスト（src/lib/push.ts）にある配信事業者を、すべて書いている
+  for (const provider of ["Apple", "Google", "Microsoft", "Mozilla"]) await expect(page.locator("body")).toContainText(provider);
   await page.getByRole("link", { name: "トップへ戻る" }).click();
   await expect(appMain(page)).toHaveAttribute("data-state", "idle");
 });
@@ -243,6 +345,17 @@ test("10) 一連の流れで console error が出ない", async ({ page, request
   expect(errors.filter((line) => !C2B_ASSET_PATTERN.test(line))).toEqual([]);
 });
 
+test("過去のメールでも確認リンクを選び、本文を読める", async ({ page, request }) => {
+  const address = await issueAddress(page);
+  await inject(request, address, "github-link.eml", "noreply@example.test");
+  await inject(request, address, "supabase-plain.eml", "noreply@example.test");
+  const past = page.locator("details.past");
+  await past.locator(":scope > summary").click();
+  await expect(past.getByRole("link", { name: "開く" })).toHaveAttribute("href", /\/users\/verify\?/);
+  await past.getByText("本文を表示", { exact: true }).click();
+  await expect(past.locator("pre")).toContainText("Verify email address");
+});
+
 test("11) 2通目が届くと1通目は「前に届いたメール」に畳まれる", async ({ page, request }) => {
   const address = await issueAddress(page);
   await inject(request, address, "supabase-plain.eml", "noreply@supabase.com");
@@ -252,9 +365,9 @@ test("11) 2通目が届くと1通目は「前に届いたメール」に畳ま�
   await expect(page.locator(".code")).toHaveText("640218", { timeout: 6000 });
 
   const past = page.locator("details.past");
-  await expect(past.locator("summary")).toHaveText("前に届いたメール（1件）");
+  await expect(past.locator(":scope > summary")).toHaveText("前に届いたメール（1件）");
   await expect(past.locator(".past-item__code")).toBeHidden();
-  await past.locator("summary").click();
+  await past.locator(":scope > summary").click();
   await expect(past.locator(".past-item__code")).toHaveText("482913");
 
   await page.locator("details.body > summary").click();

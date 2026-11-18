@@ -48,6 +48,24 @@ function topOf(page, selector) {
   }, selector);
 }
 
+test.describe("アドレスの削除", () => {
+  test.use({ serviceWorkers: "block" });
+  test("削除を確認できるまで元のアドレスを保つ", async ({ page }) => {
+    const address = await issueAddress(page);
+    const local = address.split("@")[0];
+    await page.route(`**/api/address/${local}`, (route) => route.fulfill({ status: 503 }), { times: 1 });
+    page.on("dialog", (dialog) => dialog.accept());
+    await page.locator("#new-address").click();
+    await expect(page.getByRole("alert").or(page.locator("#address").filter({ hasNotText: address }))).toBeVisible();
+    await expect(page.locator("#address")).toHaveText(address);
+    await expect(page.getByRole("alert")).toContainText("削除");
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem("sutemail.v1"))?.local)).toBe(local);
+    await page.locator("#new-address").click();
+    await expect(page.locator("#address")).not.toHaveText(address);
+    await expect(appMain(page)).toHaveAttribute("data-state", "waiting");
+  });
+});
+
 test("18) 受信後に青の塗りボタンは「コードをコピー」1つだけ（P1）", async ({ page, request }) => {
   const address = await issueAddress(page);
   // 待受のあいだはアドレスのコピーが主行動

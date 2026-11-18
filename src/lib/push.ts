@@ -79,7 +79,11 @@ export function parsePushSubscription(value: unknown): PushSubscriptionRecord | 
   } catch {
     return null;
   }
-  if (url.protocol !== "https:") return null;
+  if (url.protocol !== "https:" || url.port || url.username || url.password) return null;
+  const host = url.hostname;
+  // 公表されている配信事業者だけを通す。Windows 版 Edge は、Windows の通知サービス（*.notify.windows.com）を使う。
+  if (host !== "fcm.googleapis.com" && host !== "updates.push.services.mozilla.com" &&
+      !host.endsWith(".push.apple.com") && !host.endsWith(".notify.windows.com")) return null;
   const keys = candidate.keys;
   if (typeof keys !== "object" || keys === null) return null;
   const { p256dh, auth } = keys as Record<string, unknown>;
@@ -107,6 +111,7 @@ export async function sendPush(
     );
     const response = await fetch(subscription.endpoint, {
       method: "POST",
+      redirect: "error",
       headers: built.headers,
       body: built.body,
     });

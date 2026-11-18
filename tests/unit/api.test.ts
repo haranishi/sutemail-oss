@@ -47,7 +47,7 @@ const VAPID_ENV: Partial<Env> = {
   VAPID_PRIVATE_KEY: base64url(new Uint8Array(32).fill(7)),
 };
 
-function subscription(endpoint = "https://push.example.com/send/abc"): unknown {
+function subscription(endpoint = "https://fcm.googleapis.com/send/abc"): unknown {
   return {
     endpoint,
     expirationTime: null,
@@ -132,7 +132,12 @@ describe("Web Push の購読（FR-17）", () => {
       post(`/api/address/${issued.local}/push`, subscription(), auth(issued.token)),
       VAPID_ENV,
     );
+    const registration = async () => {
+      const response = await SELF.fetch(`http://example.com/api/address/${issued.local}`, { headers: auth(issued.token) });
+      return (await response.json() as { hasPushSubscription: boolean }).hasPushSubscription;
+    };
     expect(saved.status).toBe(204);
+    expect(await registration()).toBe(true);
     expect((await getAddress(env.INBOX, issued.local))?.pushSub).toEqual(subscription());
 
     const removed = await callApi(
@@ -143,6 +148,7 @@ describe("Web Push の購読（FR-17）", () => {
       VAPID_ENV,
     );
     expect(removed.status).toBe(204);
+    expect(await registration()).toBe(false);
     expect((await getAddress(env.INBOX, issued.local))?.pushSub).toBeUndefined();
   });
 
@@ -156,7 +162,7 @@ describe("Web Push の購読（FR-17）", () => {
   it("壊れた購読と認証なしを弾く", async () => {
     const { body: issued } = await issue({ "CF-Connecting-IP": "192.0.2.22" });
     const badKeys = await callApi(
-      post(`/api/address/${issued.local}/push`, { endpoint: "https://push.example.com/x" }, auth(issued.token)),
+      post(`/api/address/${issued.local}/push`, { endpoint: "https://fcm.googleapis.com/x" }, auth(issued.token)),
       VAPID_ENV,
     );
     expect(badKeys.status).toBe(400);
@@ -200,6 +206,17 @@ describe("届いた・届かなかった報告（FR-18）", () => {
     });
   });
 
+  it("JSON の上限を文字数でなく受信バイト数で判定する", async () => {
+    const { body: issued } = await issue();
+    const body = { local: issued.local, host: "example.test", result: "ok", note: "あ".repeat(350) };
+    // ストリームには長さヘッダーを付けない。本文は 1 KiB を少し超える。
+    const request = new Request("http://example.com/api/report", {
+      method: "POST", headers: auth(issued.token), body: new Response(JSON.stringify(body)).body,
+    });
+    expect(request.headers.has("Content-Length")).toBe(false);
+    expect((await callApi(request)).status).toBe(400);
+  });
+
   it("別のアドレスからの報告は同じホストでも数える", async () => {
     const { body: first } = await issue({ "CF-Connecting-IP": "192.0.2.31" });
     const { body: second } = await issue({ "CF-Connecting-IP": "192.0.2.32" });
@@ -240,6 +257,18 @@ describe("届いた・届かなかった報告（FR-18）", () => {
       post("/api/report", { local: "abcdefgh23", host: "example.com", result: "ok" }, auth(issued.token)),
     );
     expect(unknown.status).toBe(404);
+  });
+
+  it("上位サイトが KV の2ページ目にあっても返す", async () => {
+    const list = vi.fn()
+      .mockResolvedValueOnce({ keys: [{ name: "stat:a.test", metadata: { ok: 1 } }], list_complete: false, cursor: "next" })
+      .mockResolvedValueOnce({ keys: [{ name: "stat:z.test", metadata: { ok: 99 } }], list_complete: true });
+    const response = await callApi(new Request("http://example.com/api/stats/top"), {
+      INBOX: { list } as unknown as KVNamespace,
+    });
+    const body = await response.json() as { stats: { host: string }[] };
+    expect(body.stats.map((row) => row.host)).toEqual(["z.test", "a.test"]);
+    expect(list.mock.calls[1][0].cursor).toBe("next");
   });
 
   it("実績のないホストは0件、上位一覧は件数順に最大10件", async () => {

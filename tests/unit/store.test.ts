@@ -37,7 +37,7 @@ const VAPID_ENV: Partial<Env> = {
 };
 
 const subscription = {
-  endpoint: "https://push.example.com/send/abc",
+  endpoint: "https://fcm.googleapis.com/send/abc",
   expirationTime: null,
   keys: { p256dh: base64url(new Uint8Array(65).fill(4)), auth: base64url(new Uint8Array(16).fill(9)) },
 };
@@ -133,10 +133,39 @@ describe("メッセージ索引（I-2）", () => {
     ]);
   });
 
+  it("同時刻に ID の末尾が一致しても両方の本文を保存する", async () => {
+    const ids = ["10000000-0000-4000-8000-000000001234", "20000000-0000-4000-8000-000000001234"];
+    for (const id of ids) await putMessage(env.INBOX, local, message(id, 123), 600, 600);
+    for (const id of ids) expect((await getMessage(env.INBOX, local, id))?.text).toBe(`本文 ${id}`);
+  });
+
   it("索引に無い本文は取り出せない", async () => {
     await issue();
     await putMessage(env.INBOX, local, message("msg-0001", 1_700_000_000_000), 600, 600);
     expect(await getMessage(env.INBOX, local, "msg-9999")).toBeNull();
+  });
+
+  it("本文の削除に一度失敗しても、持ち主が DELETE をやり直せる", async () => {
+    await issue();
+    await putMessage(env.INBOX, local, message("sample", Date.now()), 600, 600);
+    const unstable = new Proxy(env.INBOX, {
+      get(target, property) {
+        if (property === "delete") return async (key: string) => {
+          if (key.startsWith("msg:")) throw new Error("temporary KV error");
+          await target.delete(key);
+        };
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const request = () => new Request(`http://example.com/api/address/${local}`, {
+      method: "DELETE", headers: authHeaders,
+    });
+    await expect(callApi(request(), { INBOX: unstable })).rejects.toThrow("temporary KV error");
+    const retry = await callApi(request());
+    expect(retry.status).toBe(204);
+    expect((await env.INBOX.list({ prefix: `msg:${local}:` })).keys).toEqual([]);
+    expect(await getAddress(env.INBOX, local)).toBeNull();
   });
 
   it("DELETE は索引から漏れた鍵も list で掃除し、idx: 自身も消す", async () => {

@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@block65/webcrypto-web-push": "^2.0.0",
+    "entities": "6.0.1",
     "postal-mime": "4.1.4"
   },
   "devDependencies": {

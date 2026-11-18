@@ -40,6 +40,7 @@ const turnstile = { requested: false, ready: false };
 
 let lastSignature = "";
 let seenMessageIds = new Set();
+let messageRequest = 0;
 let pollTimer = null;
 let pollStartedAt = 0;
 let tickTimer = null;
@@ -164,8 +165,9 @@ function loadStored() {
   return null;
 }
 
-function saveStored(address) {
+function saveStored(address, issued = false) {
   try {
+    if (!issued && loadStored()?.token !== address.token) return;
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -181,8 +183,9 @@ function saveStored(address) {
   }
 }
 
-function clearStored() {
+function clearStored(token = state.address?.token) {
   try {
+    if (loadStored()?.token !== token) return;
     localStorage.removeItem(STORAGE_KEY);
   } catch {
     // 消せなくても実害はない
@@ -206,7 +209,6 @@ async function loadConfig() {
     if (!state.lastAddress && expiredLocal && state.config?.mailDomain) {
       state.lastAddress = `${expiredLocal}@${state.config.mailDomain}`;
     }
-    if (state.config?.turnstileSiteKey) ensureTurnstile(state.config.turnstileSiteKey);
     render(state);
     if (state.config?.push === true) refreshPushState();
   } catch {
@@ -252,11 +254,12 @@ async function issue() {
     state.messages = [];
     state.flashMessageId = null;
     seenMessageIds = new Set();
+    state.push = { subscribed: false, busy: false, note: "" };
     ui.openDetails.clear();
     ui.bodyTexts.clear();
     resetReport();
     resetTurnstile();
-    saveStored(state.address);
+    saveStored(state.address, true);
     state.name = "waiting";
     startPolling();
     refreshPushState();
@@ -269,9 +272,13 @@ async function issue() {
 }
 
 async function refreshMessages({ announceArrival = true } = {}) {
-  if (!state.address) return;
+  const address = state.address;
+  if (!address) return;
+  const request = ++messageRequest;
+  const current = () => state.address === address && request === messageRequest;
   try {
-    const response = await apiGet(`/api/address/${state.address.local}/messages`);
+    const response = await apiGet(`/api/address/${address.local}/messages`);
+    if (!current()) return;
     if (response.status === 410 || response.status === 404 || response.status === 401) {
       expire();
       return;
@@ -282,6 +289,7 @@ async function refreshMessages({ announceArrival = true } = {}) {
       return;
     }
     const data = await response.json();
+    if (!current()) return;
     const messages = Array.isArray(data.messages) ? data.messages : [];
     const arrived = messages.filter((message) => !seenMessageIds.has(message.id));
     for (const message of messages) seenMessageIds.add(message.id);
@@ -296,6 +304,7 @@ async function refreshMessages({ announceArrival = true } = {}) {
     }
     render(state);
   } catch {
+    if (!current()) return;
     // 直前の表示は残したまま「再試行」を出す（docs/02_ux_design.md ③ 分岐と復帰）
     state.error = "通信に失敗しました。";
     render(state);
@@ -355,23 +364,33 @@ function confirmReplaceAddress() {
  */
 async function replaceAddress() {
   if (state.busy || !state.address) return;
-  const { local, token } = state.address;
+  const address = state.address;
+  state.busy = true;
   stopPolling();
-  // 先に手元の記録を消す。発行に失敗しても、消えたアドレスを掴んだままにしない
+  render(state);
+  try {
+    const response = await fetch(`/api/address/${address.local}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${address.token}` },
+      cache: "no-store",
+    });
+    if (!response.ok && ![404, 410].includes(response.status)) throw new Error("Delete failed");
+  } catch {
+    if (state.address === address) {
+      state.error = "削除を確認できませんでした。「新しいアドレス」からやり直してください。";
+      scheduleNextPoll(pollIntervalMs());
+    }
+    return;
+  } finally {
+    state.busy = false;
+    render(state);
+  }
+  if (state.address !== address) return;
   clearStored();
   state.address = null;
   state.messages = [];
   state.flashMessageId = null;
   state.name = "idle";
-  try {
-    await fetch(`/api/address/${local}`, {
-      method: "DELETE",
-      headers: { authorization: `Bearer ${token}` },
-      cache: "no-store",
-    });
-  } catch {
-    // 消せなくても10分で失効する。次の発行を止める理由にはしない
-  }
   await issue();
 }
 
@@ -402,6 +421,10 @@ async function runPoll() {
     return;
   }
   if (document.visibilityState !== "visible") return; // 見えていない間は止める（FR-11）
+  if (!state.address.address) {
+    await restore({ ...state.address, reported: [...report.reported] });
+    return;
+  }
   await refreshMessages();
   if (state.address) scheduleNextPoll(pollIntervalMs());
 }
@@ -491,9 +514,10 @@ function ensureTurnstile(siteKey) {
 
 function drawTurnstile() {
   const siteKey = state.config?.turnstileSiteKey;
-  if (!turnstile.ready || !window.turnstile || !siteKey) return;
   const holder = document.getElementById("turnstile");
-  if (!holder || holder.dataset.rendered === "true") return;
+  if (!siteKey || !holder) return;
+  ensureTurnstile(siteKey);
+  if (!turnstile.ready || !window.turnstile || holder.dataset.rendered === "true") return;
   holder.dataset.rendered = "true";
   window.turnstile.render(holder, {
     sitekey: siteKey,
@@ -537,9 +561,11 @@ async function currentPushSubscription() {
 }
 
 async function refreshPushState() {
-  if (state.config?.push !== true) return;
+  const address = state.address;
+  if (state.config?.push !== true || !address) return;
   const subscription = await currentPushSubscription();
-  state.push = { ...state.push, subscribed: Boolean(subscription) };
+  if (state.address !== address) return;
+  state.push = { ...state.push, subscribed: Boolean(subscription && address.hasPushSubscription) };
   render(state);
 }
 
@@ -574,6 +600,7 @@ async function enablePush() {
       state.push.note = "通知を登録できませんでした。少し待ってからもう一度お試しください。";
       return;
     }
+    state.address.hasPushSubscription = true;
     state.push.subscribed = true;
     showToast("通知をオンにしました");
   } catch {
@@ -598,6 +625,7 @@ async function disablePush() {
         cache: "no-store",
       }).catch(() => {});
     }
+    if (state.address) state.address.hasPushSubscription = false;
     state.push.subscribed = false;
   } finally {
     state.push.busy = false;
@@ -1097,7 +1125,7 @@ function codeSlot(model) {
  */
 function extrasBlock(model) {
   if (model.name !== "received") return el("div", { class: "extras extras--empty", id: "msg-extras" });
-  return el("div", { class: "extras", id: "msg-extras" }, [pastMessagesBlock(model), bodyBlock(model)].filter(Boolean));
+  return el("div", { class: "extras", id: "msg-extras" }, [pastMessagesBlock(model), bodyBlock(model.messages[0], true)].filter(Boolean));
 }
 
 function pastMessagesBlock(model) {
@@ -1110,15 +1138,17 @@ function pastMessagesBlock(model) {
     () => past.map((message) => {
       const codes = visibleCodes(message);
       return el("div", { class: "past-item" }, [
-        codes.length > 0 ? el("p", { class: "past-item__code", text: codes[0].value }) : null,
-        codes.length > 0
-          ? el("button", {
-              class: "btn",
-              type: "button",
-              text: "このコードをコピー",
-              onclick: () => copyAndTell(codes[0].value),
-            })
-          : null,
+        ...codes.flatMap((code) => [
+          el("p", { class: "past-item__code", text: code.value }),
+          el("button", {
+            class: "btn",
+            type: "button",
+            text: "このコードをコピー",
+            onclick: () => copyAndTell(code.value),
+          }),
+        ]),
+        ...(message.links ?? []).map((link) => linkBlock(link, false)),
+        bodyBlock(message, false),
         el("dl", { class: "meta" }, [
           el("dt", { text: "送信元" }),
           el("dd", { text: message.from || "（不明）" }),
@@ -1132,13 +1162,11 @@ function pastMessagesBlock(model) {
   );
 }
 
-function bodyBlock(model) {
-  const message = model.messages[0];
-  if (!message) return null;
-  return detailsBlock("body", "本文を表示", "body", (node) => {
+function bodyBlock(message, latest) {
+  return detailsBlock(`body:${message.id}`, "本文を表示", latest ? "body" : "past-body", (node) => {
     const pre = el("pre", {
       class: "body__text",
-      id: "body-text",
+      id: latest ? "body-text" : null,
       text: ui.bodyTexts.get(message.id) ?? message.textPreview ?? "",
     });
     // 全文はここで初めて取りに行く（開くまで取得しない）
@@ -1214,7 +1242,7 @@ function viewFor(model) {
     return [notice, remaining, slot, address, extrasBlock(model), push].filter(Boolean);
   }
 
-  return [el("p", { class: "lede", text: "読み込んでいます…" })];
+  return [noticeBlock(model), el("p", { class: "lede", text: "読み込んでいます…" })];
 }
 
 function render(model) {
@@ -1224,10 +1252,14 @@ function render(model) {
   if (next === lastSignature) return;
   lastSignature = next;
   main.dataset.state = model.name;
-  if (model.name === "loading") main.setAttribute("aria-busy", "true");
+  if (model.name === "loading" && !model.error) main.setAttribute("aria-busy", "true");
   else main.removeAttribute("aria-busy");
   // viewFor は「その状態では出さない部品」を null で返すので、ここで落とす
+  // 自動更新で同じアドレスの操作ボタンからキーボードのフォーカスを奪わない。
+  const focused = document.activeElement;
+  const actionId = focused?.matches("#poll-now, #new-address, #copy-address") ? focused.id : "";
   main.replaceChildren(...viewFor(model).filter(Boolean));
+  if (actionId) document.getElementById(actionId)?.focus({ preventScroll: true });
   drawTurnstile(); // 枠を描き直したので、ウィジェットも入れ直す（サイトキーがある時だけ動く）
 }
 
@@ -1243,20 +1275,26 @@ function registerServiceWorker() {
 }
 
 async function restore(stored) {
-  state.address = { local: stored.local, token: stored.token, expiresAt: stored.expiresAt, address: "" };
+  const restoring = { local: stored.local, token: stored.token, expiresAt: stored.expiresAt, address: "" };
+  state.address = restoring;
   report.reported = new Set(stored.reported ?? []);
   try {
     const response = await apiGet(`/api/address/${stored.local}`);
-    if (!response.ok) {
+    if (state.address !== restoring) return;
+    if ([401, 404, 410].includes(response.status)) {
       expire();
       return;
     }
+    if (!response.ok) throw new Error("Address lookup failed");
     const data = await response.json();
+    if (state.address !== restoring) return;
+    state.error = "";
     state.address = {
       local: stored.local,
       token: stored.token,
       expiresAt: data.expiresAt ?? stored.expiresAt,
       address: data.address,
+      hasPushSubscription: data.hasPushSubscription === true,
     };
     saveStored(state.address);
     state.name = "waiting";
@@ -1265,10 +1303,11 @@ async function restore(stored) {
     startPolling();
     refreshPushState();
   } catch {
-    // 通信できないだけかもしれないので、期限切れにはせず再試行を出す
-    state.error = "通信に失敗しました。";
-    state.name = "waiting";
+    if (state.address !== restoring) return;
+    state.error = "アドレスを読み込めませんでした。";
+    state.name = "loading";
     render(state);
+    scheduleNextPoll(POLL_FAST_MS);
   }
 }
 
@@ -1293,7 +1332,7 @@ async function boot() {
     return;
   }
   if (stored.expiresAt <= Date.now()) {
-    clearStored();
+    clearStored(stored.token);
     expiredLocal = stored.local;
     if (state.config?.mailDomain) state.lastAddress = `${expiredLocal}@${state.config.mailDomain}`;
     state.name = "expired";
