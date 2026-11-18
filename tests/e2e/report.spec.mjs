@@ -91,6 +91,26 @@ test("15) 未発行と期限切れの画面に「最近の実績」が出る", a
   await expect(page.locator("#report")).toBeVisible();
 });
 
+test.describe("発行時の確認", () => {
+  test.use({ serviceWorkers: "block" });
+  test("受信箱の復元時には確認用の外部スクリプトを読み込まない", async ({ page }) => {
+    await issueAddress(page);
+    const address = await page.locator("#address").innerText();
+    await page.route("**/api/config", (route) => route.fulfill({
+      json: { mailDomain: "sutemail.test", addressTtlSeconds: 600, turnstileSiteKey: "test" },
+    }));
+    await page.route("https://challenges.cloudflare.com/**", (route) => route.abort());
+    const config = page.waitForResponse("**/api/config");
+    await page.reload();
+    await config;
+    await expect(page.locator("#address")).toHaveText(address);
+    await expect(page.locator("#turnstile-script")).toHaveCount(0);
+    await page.evaluate(() => localStorage.removeItem("sutemail.v1"));
+    await page.reload();
+    await expect(page.locator("#turnstile-script")).toHaveCount(1);
+  });
+});
+
 test("16) 通知ボタンは push が無効なサーバーでは出ない", async ({ page, request }) => {
   const config = await (await request.get("/api/config")).json();
   expect(config.push).toBe(false);

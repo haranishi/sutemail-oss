@@ -209,7 +209,6 @@ async function loadConfig() {
     if (!state.lastAddress && expiredLocal && state.config?.mailDomain) {
       state.lastAddress = `${expiredLocal}@${state.config.mailDomain}`;
     }
-    if (state.config?.turnstileSiteKey) ensureTurnstile(state.config.turnstileSiteKey);
     render(state);
     if (state.config?.push === true) refreshPushState();
   } catch {
@@ -515,9 +514,10 @@ function ensureTurnstile(siteKey) {
 
 function drawTurnstile() {
   const siteKey = state.config?.turnstileSiteKey;
-  if (!turnstile.ready || !window.turnstile || !siteKey) return;
   const holder = document.getElementById("turnstile");
-  if (!holder || holder.dataset.rendered === "true") return;
+  if (!siteKey || !holder) return;
+  ensureTurnstile(siteKey);
+  if (!turnstile.ready || !window.turnstile || holder.dataset.rendered === "true") return;
   holder.dataset.rendered = "true";
   window.turnstile.render(holder, {
     sitekey: siteKey,
