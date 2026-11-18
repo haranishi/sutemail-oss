@@ -321,6 +321,8 @@ test("9) 静的3ページが開き、必要な節があり、トップへ戻れ�
   }
   await page.goto("/external-transmission");
   await expect(page.locator("body")).toContainText("challenges.cloudflare.com");
+  // 通知の許可リスト（src/lib/push.ts）にある配信事業者を、すべて書いている
+  for (const provider of ["Apple", "Google", "Microsoft", "Mozilla"]) await expect(page.locator("body")).toContainText(provider);
   await page.getByRole("link", { name: "トップへ戻る" }).click();
   await expect(appMain(page)).toHaveAttribute("data-state", "idle");
 });
