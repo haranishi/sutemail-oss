@@ -1,3 +1,5 @@
+import { decodeHTML, decodeHTMLAttribute } from "entities";
+
 export interface HtmlLink {
   url: string;
   label: string;
@@ -36,9 +38,9 @@ export async function htmlToTextAndLinks(html: string): Promise<{ text: string; 
   let currentLink: { url: string; labelParts: string[] } | null = null;
   rewriter.on("a[href]", {
     element(element) {
-      currentLink = { url: element.getAttribute("href") ?? "", labelParts: [] };
+      currentLink = { url: decodeHTMLAttribute(element.getAttribute("href") ?? ""), labelParts: [] };
       element.onEndTag(() => {
-        if (currentLink) links.push({ url: currentLink.url, label: currentLink.labelParts.join("").trim() });
+        if (currentLink) links.push({ url: currentLink.url, label: decodeHTML(currentLink.labelParts.join("")).trim() });
         currentLink = null;
       });
     },
@@ -49,6 +51,6 @@ export async function htmlToTextAndLinks(html: string): Promise<{ text: string; 
 
   const response = rewriter.transform(new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } }));
   await response.arrayBuffer();
-  const text = textParts.join("").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  const text = decodeHTML(textParts.join("")).replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
   return { text, links };
 }
