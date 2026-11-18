@@ -1120,7 +1120,7 @@ function codeSlot(model) {
  */
 function extrasBlock(model) {
   if (model.name !== "received") return el("div", { class: "extras extras--empty", id: "msg-extras" });
-  return el("div", { class: "extras", id: "msg-extras" }, [pastMessagesBlock(model), bodyBlock(model)].filter(Boolean));
+  return el("div", { class: "extras", id: "msg-extras" }, [pastMessagesBlock(model), bodyBlock(model.messages[0], true)].filter(Boolean));
 }
 
 function pastMessagesBlock(model) {
@@ -1133,15 +1133,17 @@ function pastMessagesBlock(model) {
     () => past.map((message) => {
       const codes = visibleCodes(message);
       return el("div", { class: "past-item" }, [
-        codes.length > 0 ? el("p", { class: "past-item__code", text: codes[0].value }) : null,
-        codes.length > 0
-          ? el("button", {
-              class: "btn",
-              type: "button",
-              text: "このコードをコピー",
-              onclick: () => copyAndTell(codes[0].value),
-            })
-          : null,
+        ...codes.flatMap((code) => [
+          el("p", { class: "past-item__code", text: code.value }),
+          el("button", {
+            class: "btn",
+            type: "button",
+            text: "このコードをコピー",
+            onclick: () => copyAndTell(code.value),
+          }),
+        ]),
+        ...(message.links ?? []).map((link) => linkBlock(link, false)),
+        bodyBlock(message, false),
         el("dl", { class: "meta" }, [
           el("dt", { text: "送信元" }),
           el("dd", { text: message.from || "（不明）" }),
@@ -1155,13 +1157,11 @@ function pastMessagesBlock(model) {
   );
 }
 
-function bodyBlock(model) {
-  const message = model.messages[0];
-  if (!message) return null;
-  return detailsBlock("body", "本文を表示", "body", (node) => {
+function bodyBlock(message, latest) {
+  return detailsBlock(`body:${message.id}`, "本文を表示", latest ? "body" : "past-body", (node) => {
     const pre = el("pre", {
       class: "body__text",
-      id: "body-text",
+      id: latest ? "body-text" : null,
       text: ui.bodyTexts.get(message.id) ?? message.textPreview ?? "",
     });
     // 全文はここで初めて取りに行く（開くまで取得しない）

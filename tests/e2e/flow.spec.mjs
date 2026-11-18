@@ -305,6 +305,17 @@ test("10) 一連の流れで console error が出ない", async ({ page, request
   expect(errors.filter((line) => !C2B_ASSET_PATTERN.test(line))).toEqual([]);
 });
 
+test("過去のメールでも確認リンクを選び、本文を読める", async ({ page, request }) => {
+  const address = await issueAddress(page);
+  await inject(request, address, "github-link.eml", "noreply@example.test");
+  await inject(request, address, "supabase-plain.eml", "noreply@example.test");
+  const past = page.locator("details.past");
+  await past.locator(":scope > summary").click();
+  await expect(past.getByRole("link", { name: "開く" })).toHaveAttribute("href", /\/users\/verify\?/);
+  await past.getByText("本文を表示", { exact: true }).click();
+  await expect(past.locator("pre")).toContainText("Verify email address");
+});
+
 test("11) 2通目が届くと1通目は「前に届いたメール」に畳まれる", async ({ page, request }) => {
   const address = await issueAddress(page);
   await inject(request, address, "supabase-plain.eml", "noreply@supabase.com");
@@ -314,9 +325,9 @@ test("11) 2通目が届くと1通目は「前に届いたメール」に畳ま�
   await expect(page.locator(".code")).toHaveText("640218", { timeout: 6000 });
 
   const past = page.locator("details.past");
-  await expect(past.locator("summary")).toHaveText("前に届いたメール（1件）");
+  await expect(past.locator(":scope > summary")).toHaveText("前に届いたメール（1件）");
   await expect(past.locator(".past-item__code")).toBeHidden();
-  await past.locator("summary").click();
+  await past.locator(":scope > summary").click();
   await expect(past.locator(".past-item__code")).toHaveText("482913");
 
   await page.locator("details.body > summary").click();
