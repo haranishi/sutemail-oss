@@ -149,6 +149,23 @@ test("5) 期限が切れると expired になり、1タップで新しいアド�
   expect(second).not.toBe(first);
 });
 
+test.describe("アドレスの復元", () => {
+  test.use({ serviceWorkers: "block" });
+  for (const failure of ["503", "通信断"]) {
+    test(`復元中の${failure}から元のアドレスに戻れる`, async ({ page }) => {
+      const original = await issueAddress(page);
+      const local = original.split("@")[0];
+      await page.route(`**/api/address/${local}`, (route) =>
+        failure === "503" ? route.fulfill({ status: 503 }) : route.abort(), { times: 1 });
+      await page.reload();
+      await expect(page.getByRole("alert").or(page.locator("#reissue"))).toBeVisible();
+      expect(await page.evaluate(() => JSON.parse(localStorage.getItem("sutemail.v1"))?.local)).toBe(local);
+      await page.getByRole("button", { name: "再試行" }).click();
+      await expect(page.locator("#address")).toHaveText(original);
+    });
+  }
+});
+
 test("6) 読み込み直しても状態が戻る", async ({ page, request }) => {
   const address = await issueAddress(page);
   await inject(request, address, "supabase-plain.eml", "noreply@supabase.com");

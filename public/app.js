@@ -402,6 +402,10 @@ async function runPoll() {
     return;
   }
   if (document.visibilityState !== "visible") return; // 見えていない間は止める（FR-11）
+  if (!state.address.address) {
+    await restore({ ...state.address, reported: [...report.reported] });
+    return;
+  }
   await refreshMessages();
   if (state.address) scheduleNextPoll(pollIntervalMs());
 }
@@ -1214,7 +1218,7 @@ function viewFor(model) {
     return [notice, remaining, slot, address, extrasBlock(model), push].filter(Boolean);
   }
 
-  return [el("p", { class: "lede", text: "読み込んでいます…" })];
+  return [noticeBlock(model), el("p", { class: "lede", text: "読み込んでいます…" })];
 }
 
 function render(model) {
@@ -1224,7 +1228,7 @@ function render(model) {
   if (next === lastSignature) return;
   lastSignature = next;
   main.dataset.state = model.name;
-  if (model.name === "loading") main.setAttribute("aria-busy", "true");
+  if (model.name === "loading" && !model.error) main.setAttribute("aria-busy", "true");
   else main.removeAttribute("aria-busy");
   // viewFor は「その状態では出さない部品」を null で返すので、ここで落とす
   main.replaceChildren(...viewFor(model).filter(Boolean));
@@ -1243,15 +1247,20 @@ function registerServiceWorker() {
 }
 
 async function restore(stored) {
-  state.address = { local: stored.local, token: stored.token, expiresAt: stored.expiresAt, address: "" };
+  const restoring = { local: stored.local, token: stored.token, expiresAt: stored.expiresAt, address: "" };
+  state.address = restoring;
   report.reported = new Set(stored.reported ?? []);
   try {
     const response = await apiGet(`/api/address/${stored.local}`);
-    if (!response.ok) {
+    if (state.address !== restoring) return;
+    if ([401, 404, 410].includes(response.status)) {
       expire();
       return;
     }
+    if (!response.ok) throw new Error("Address lookup failed");
     const data = await response.json();
+    if (state.address !== restoring) return;
+    state.error = "";
     state.address = {
       local: stored.local,
       token: stored.token,
@@ -1265,10 +1274,11 @@ async function restore(stored) {
     startPolling();
     refreshPushState();
   } catch {
-    // 通信できないだけかもしれないので、期限切れにはせず再試行を出す
-    state.error = "通信に失敗しました。";
-    state.name = "waiting";
+    if (state.address !== restoring) return;
+    state.error = "アドレスを読み込めませんでした。";
+    state.name = "loading";
     render(state);
+    scheduleNextPoll(POLL_FAST_MS);
   }
 }
 
