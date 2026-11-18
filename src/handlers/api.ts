@@ -217,8 +217,8 @@ export async function handleApi(request: Request, env: Env): Promise<Response | 
   if (request.method === "POST" && path === "/api/report") return reportDelivery(request, env);
 
   if (request.method === "GET" && path === "/api/stats/top") {
-    const stats = await listStats(env.INBOX);
-    return json({ stats: stats.slice(0, TOP_STATS_LIMIT) }, 200, { "Cache-Control": STATS_CACHE_CONTROL });
+    const stats = await listStats(env.INBOX, TOP_STATS_LIMIT);
+    return json({ stats }, 200, { "Cache-Control": STATS_CACHE_CONTROL });
   }
 
   if (request.method === "GET" && path === "/api/stats") {

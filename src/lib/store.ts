@@ -267,8 +267,7 @@ export async function bumpStat(kv: KVNamespace, host: string, result: "ok" | "ng
   const current = (await getStat(kv, host)) ?? { ok: 0, ng: 0, updatedAt: 0 };
   current[result] += 1;
   current.updatedAt = Date.now();
-  // 集計を metadata にも持たせる。上位10件は list() のメタデータだけで並べられる＝
-  // 1リクエストあたりのサブリクエスト上限（Free 50件）に触れずに済む。
+  // 集計を metadata にも持たせ、順位を求めるときにホストごとの get を省く。
   await kv.put(`${STAT_PREFIX}${host}`, JSON.stringify(current), {
     metadata: { ok: current.ok, ng: current.ng },
   });
@@ -283,14 +282,21 @@ export async function getStat(kv: KVNamespace, host: string): Promise<DeliverySt
  * 実績を件数の多い順に返す。値は読まず `list()` の metadata だけを使う。
  * metadata の無い古い鍵は 0件扱いになり、合計0として除かれる。
  */
-export async function listStats(kv: KVNamespace, limit = 1000): Promise<StatEntry[]> {
-  const listed = await kv.list<{ ok?: number; ng?: number }>({ prefix: STAT_PREFIX, limit });
-  return listed.keys
-    .map((key) => ({
-      host: key.name.slice(STAT_PREFIX.length),
-      ok: Number(key.metadata?.ok ?? 0),
-      ng: Number(key.metadata?.ng ?? 0),
-    }))
-    .filter((entry) => entry.host.length > 0 && entry.ok + entry.ng > 0)
-    .sort((a, b) => b.ok + b.ng - (a.ok + a.ng) || (a.host < b.host ? -1 : a.host > b.host ? 1 : 0));
+export async function listStats(kv: KVNamespace, limit = 10): Promise<StatEntry[]> {
+  let cursor: string | undefined;
+  let top: StatEntry[] = [];
+  do {
+    const page: KVNamespaceListResult<{ ok?: number; ng?: number }> =
+      await kv.list({ prefix: STAT_PREFIX, cursor });
+    for (const key of page.keys) {
+      const host = key.name.slice(STAT_PREFIX.length);
+      const ok = Number(key.metadata?.ok ?? 0);
+      const ng = Number(key.metadata?.ng ?? 0);
+      if (host && ok + ng > 0) top.push({ host, ok, ng });
+    }
+    top.sort((a, b) => b.ok + b.ng - (a.ok + a.ng) || (a.host < b.host ? -1 : a.host > b.host ? 1 : 0));
+    top = top.slice(0, limit);
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  return top;
 }

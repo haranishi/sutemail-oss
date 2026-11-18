@@ -37,7 +37,7 @@ tools/screenshots.mjs  390/768/1440 の状態別スクショ → .agent-harness/
 | `idx:<local>` | `{messages:[{key, receivedAt, id}]}`（受信済みメッセージの索引） | `addr:` と同じ |
 | `msg:<local>:<receivedAtMs>-<rand4>` | `{id, from, subject, receivedAt, codes[], links[], text}` | min(アドレス残り, `MESSAGE_TTL_SECONDS`)、下限60 |
 | `rl:issue:<ipHash>` | 直近の発行時刻の配列（上限 `ISSUE_LIMIT_PER_HOUR` 件）。read-modify-write のため同時到着は素通りしうる。公開時は Turnstile を有効にすることが前提の防波堤（レビュー r2 N-3） | 3600 |
-| `stat:<host>` | `{ok, ng, updatedAt}`（同じ値を KV `metadata` にも載せ、上位10件は `list()` 1回で並べる＝Free のサブリクエスト上限50件を避ける） | なし（個人情報を含まない集計） |
+| `stat:<host>` | `{ok, ng, updatedAt}`（同じ値を KV `metadata` にも載せ、上位10件は `list()` の各ページの metadata から選び、ホストごとの追加取得を省く） | なし（個人情報を含まない集計） |
 一覧は `idx:` の索引を受信時刻降順に並べ、本文は `get` で引く。**ポーリング経路で `list` を使わない**——3秒ごとの一覧で `kv.list` を1回ずつ走らせると、アドレス1本10分で約88回になり KV の list 無料枠を使い切るため。
 
 **索引を `addr:` から独立した鍵に分けている理由**（レビュー r2 N-1）。当初は `addr:` の中に `messages` を持たせていたが、`addr:` は購読の保存・報告・`pushSent` でも read-modify-write する。受信の直前に読んだ `addr:` を受信の直後に書き戻すと索引ごと消え、**届いたメールが一覧から永久に出なくなる**（本文の鍵は KV に残るが索引から辿れない）。`idx:` を書くのは受信経路（`putMessage`）と `DELETE` の掃除だけにして、この経路を無くした。索引の書き込みは受信時の read-modify-write のままなので、同時受信の取りこぼしは MVP では許容する（索引から漏れた鍵は `DELETE` 時の `list` 掃除で拾う）。`pushSent` は1アドレスあたりの Push 送信回数で、20回で打ち切る。

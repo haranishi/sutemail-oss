@@ -259,6 +259,18 @@ describe("届いた・届かなかった報告（FR-18）", () => {
     expect(unknown.status).toBe(404);
   });
 
+  it("上位サイトが KV の2ページ目にあっても返す", async () => {
+    const list = vi.fn()
+      .mockResolvedValueOnce({ keys: [{ name: "stat:a.test", metadata: { ok: 1 } }], list_complete: false, cursor: "next" })
+      .mockResolvedValueOnce({ keys: [{ name: "stat:z.test", metadata: { ok: 99 } }], list_complete: true });
+    const response = await callApi(new Request("http://example.com/api/stats/top"), {
+      INBOX: { list } as unknown as KVNamespace,
+    });
+    const body = await response.json() as { stats: { host: string }[] };
+    expect(body.stats.map((row) => row.host)).toEqual(["z.test", "a.test"]);
+    expect(list.mock.calls[1][0].cursor).toBe("next");
+  });
+
   it("実績のないホストは0件、上位一覧は件数順に最大10件", async () => {
     const empty = await SELF.fetch("http://example.com/api/stats?host=never.example.com");
     expect(await empty.json()).toEqual({ host: "never.example.com", ok: 0, ng: 0 });
