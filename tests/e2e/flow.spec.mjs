@@ -262,6 +262,17 @@ const DOC_SECTIONS = {
   "/external-transmission": ["例外は2つだけ", "メールの中のリンクについて", "サーバーの所在"],
 };
 
+test("サービスワーカーの起動で同じサイトの別アプリのキャッシュを消さない", async ({ page }) => {
+  await page.goto("/terms");
+  await page.evaluate(async () => {
+    const other = await caches.open("offline-notes");
+    await other.put("/notes", new Response("saved notes"));
+  });
+  await page.goto("/");
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null);
+  expect(await page.evaluate(async () => (await caches.match("/notes"))?.text())).toBe("saved notes");
+});
+
 test("9) 静的3ページが開き、必要な節があり、トップへ戻れる", async ({ page }) => {
   for (const [path, sections] of Object.entries(DOC_SECTIONS)) {
     const response = await page.goto(path);
