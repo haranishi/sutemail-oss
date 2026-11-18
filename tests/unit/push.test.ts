@@ -146,10 +146,13 @@ describe("push", () => {
 
   it("公表した通知サービスの HTTPS 宛先だけを受け付ける", async () => {
     const subscription = await makeSubscription();
-    for (const origin of ["https://updates.push.services.mozilla.com", "https://web.push.apple.com"]) {
+    for (const origin of ["https://updates.push.services.mozilla.com", "https://web.push.apple.com", "https://db5p.notify.windows.com"]) {
       expect(parsePushSubscription({ ...subscription, endpoint: origin + "/test" })).not.toBeNull();
     }
     expect(parsePushSubscription({ ...subscription, endpoint: "https://example.test/notice" })).toBeNull();
+    // 末尾が似ているだけの別のホスト名は通さない
+    expect(parsePushSubscription({ ...subscription, endpoint: "https://notify.windows.com.example.test/w/" })).toBeNull();
+    expect(parsePushSubscription({ ...subscription, endpoint: "https://evilnotify.windows.com.test/w/" })).toBeNull();
   });
 
   it("整った購読はexpirationTimeを補って通す", async () => {
