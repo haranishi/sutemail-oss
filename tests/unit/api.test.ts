@@ -200,6 +200,17 @@ describe("届いた・届かなかった報告（FR-18）", () => {
     });
   });
 
+  it("JSON の上限を文字数でなく受信バイト数で判定する", async () => {
+    const { body: issued } = await issue();
+    const body = { local: issued.local, host: "example.test", result: "ok", note: "あ".repeat(350) };
+    // ストリームには長さヘッダーを付けない。本文は 1 KiB を少し超える。
+    const request = new Request("http://example.com/api/report", {
+      method: "POST", headers: auth(issued.token), body: new Response(JSON.stringify(body)).body,
+    });
+    expect(request.headers.has("Content-Length")).toBe(false);
+    expect((await callApi(request)).status).toBe(400);
+  });
+
   it("別のアドレスからの報告は同じホストでも数える", async () => {
     const { body: first } = await issue({ "CF-Connecting-IP": "192.0.2.31" });
     const { body: second } = await issue({ "CF-Connecting-IP": "192.0.2.32" });

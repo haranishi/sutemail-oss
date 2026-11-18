@@ -1,5 +1,5 @@
 import { generateLocalPart, generateToken, hashToken, isValidLocalPart, timingSafeEqualHex } from "../lib/address";
-import { getAddressTtlSeconds, getIssueLimitPerHour, isTurnstileEnabled } from "../lib/env";
+import { getAddressTtlSeconds, getIssueLimitPerHour, getMaxRawBytes, isTurnstileEnabled } from "../lib/env";
 import { getVapidKeys, parsePushSubscription } from "../lib/push";
 import { hashIp, checkAndCount } from "../lib/ratelimit";
 import {
@@ -38,14 +38,40 @@ function noContent(): Response {
   });
 }
 
-/** 小さな JSON だけを受ける。壊れていれば null（呼び出し側が 400 を返す）。 */
-async function readJsonBody(request: Request, maxBytes = 8192): Promise<unknown> {
-  const declared = Number(request.headers.get("content-length") ?? "");
-  if (Number.isFinite(declared) && declared > maxBytes) return null;
-  const text = await request.text();
-  if (text.length > maxBytes) return null;
+async function readLimitedBody(request: Request, maxBytes: number): Promise<Uint8Array | null> {
+  if (Number(request.headers.get("content-length")) > maxBytes) return null;
+  const reader = request.body?.getReader();
+  if (!reader) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
   try {
-    return JSON.parse(text) as unknown;
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+async function readJsonBody(request: Request, maxBytes = 8192): Promise<unknown> {
+  const bytes = await readLimitedBody(request, maxBytes);
+  if (!bytes) return null;
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
   } catch {
     return null;
   }
@@ -75,8 +101,7 @@ type TurnstileOutcome = "skipped" | "passed" | "failed" | "unavailable";
 
 async function verifyTurnstile(request: Request, env: Env, ip: string): Promise<TurnstileOutcome> {
   if (!isTurnstileEnabled(env)) return "skipped";
-  // 本文はサイズ上限つきで読む（M-3）。clone を素の json() で読むと上限なしに読み込める
-  const body = (await readJsonBody(request.clone())) as { turnstileToken?: unknown } | null;
+  const body = (await readJsonBody(request)) as { turnstileToken?: unknown } | null;
   const token = typeof body?.turnstileToken === "string" ? body.turnstileToken : "";
   // トークンが無いのは検証の失敗。siteverify を呼ばずに落とす（総当たりで外部へ投げない）
   if (!token) return "failed";
@@ -147,7 +172,8 @@ export function normalizeReportHost(value: unknown): string | null {
  */
 async function reportDelivery(request: Request, env: Env): Promise<Response> {
   const body = await readJsonBody(request, 1024);
-  const payload = (body ?? {}) as { local?: unknown; host?: unknown; result?: unknown };
+  if (!body) return json({ error: "Invalid report" }, 400);
+  const payload = body as { local?: unknown; host?: unknown; result?: unknown };
   const local = typeof payload.local === "string" ? payload.local : "";
   const auth = await authenticate(request, env, local);
   if (auth instanceof Response) return auth;
@@ -206,7 +232,8 @@ export async function handleApi(request: Request, env: Env): Promise<Response | 
     if (env.DEV_INJECT !== "1") return json({ error: "Not found" }, 404);
     const to = url.searchParams.get("to") ?? "";
     const from = url.searchParams.get("from") ?? "";
-    const raw = await request.arrayBuffer();
+    const raw = await readLimitedBody(request, getMaxRawBytes(env));
+    if (!raw) return json({ error: "Message too large" }, 413);
     const result = await handleIncoming({ from, to, raw, rawSize: raw.byteLength }, env);
     if (!result.ok) return json({ error: result.reason }, result.reason === "Message too large" ? 413 : 404);
     return json({ accepted: true, id: result.message.id }, 202);
