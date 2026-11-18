@@ -47,7 +47,7 @@ const VAPID_ENV: Partial<Env> = {
   VAPID_PRIVATE_KEY: base64url(new Uint8Array(32).fill(7)),
 };
 
-function subscription(endpoint = "https://push.example.com/send/abc"): unknown {
+function subscription(endpoint = "https://fcm.googleapis.com/send/abc"): unknown {
   return {
     endpoint,
     expirationTime: null,
@@ -156,7 +156,7 @@ describe("Web Push の購読（FR-17）", () => {
   it("壊れた購読と認証なしを弾く", async () => {
     const { body: issued } = await issue({ "CF-Connecting-IP": "192.0.2.22" });
     const badKeys = await callApi(
-      post(`/api/address/${issued.local}/push`, { endpoint: "https://push.example.com/x" }, auth(issued.token)),
+      post(`/api/address/${issued.local}/push`, { endpoint: "https://fcm.googleapis.com/x" }, auth(issued.token)),
       VAPID_ENV,
     );
     expect(badKeys.status).toBe(400);

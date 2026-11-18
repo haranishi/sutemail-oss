@@ -37,7 +37,7 @@ const VAPID_ENV: Partial<Env> = {
 };
 
 const subscription = {
-  endpoint: "https://push.example.com/send/abc",
+  endpoint: "https://fcm.googleapis.com/send/abc",
   expirationTime: null,
   keys: { p256dh: base64url(new Uint8Array(65).fill(4)), auth: base64url(new Uint8Array(16).fill(9)) },
 };

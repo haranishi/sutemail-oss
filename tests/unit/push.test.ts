@@ -17,7 +17,7 @@ import type { Env } from "../../src/types";
 import supabase from "../fixtures/supabase-plain.eml?raw";
 
 const baseEnv = env as unknown as Env;
-const PUSH_ORIGIN = "https://push.example.com";
+const PUSH_ORIGIN = "https://fcm.googleapis.com";
 const outboundFetch = vi.fn<typeof fetch>();
 let expectedUrls: string[] = [];
 
@@ -144,6 +144,14 @@ describe("push", () => {
     expect(parsePushSubscription({ endpoint: `${PUSH_ORIGIN}/x`, keys: { p256dh: "short", auth: "short" } })).toBeNull();
   });
 
+  it("公表した通知サービスの HTTPS 宛先だけを受け付ける", async () => {
+    const subscription = await makeSubscription();
+    for (const origin of ["https://updates.push.services.mozilla.com", "https://web.push.apple.com"]) {
+      expect(parsePushSubscription({ ...subscription, endpoint: origin + "/test" })).not.toBeNull();
+    }
+    expect(parsePushSubscription({ ...subscription, endpoint: "https://example.test/notice" })).toBeNull();
+  });
+
   it("整った購読はexpirationTimeを補って通す", async () => {
     const subscription = await makeSubscription();
     const parsed = parsePushSubscription({ endpoint: subscription.endpoint, keys: subscription.keys });
@@ -157,6 +165,7 @@ describe("push", () => {
 
     expect(await sendPush(subscription, payload, vapid)).toBe("sent");
     expect(captured).toHaveLength(1);
+    expect(outboundFetch.mock.calls[0][1]?.redirect).toBe("error");
     expect(captured[0].headers.get("TTL")).toBe("60");
     expect(captured[0].headers.get("Urgency")).toBe("high");
     expect(captured[0].headers.get("Content-Encoding")).toBe("aes128gcm");
