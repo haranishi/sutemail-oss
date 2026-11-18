@@ -75,6 +75,31 @@ test("1) idle は発行ボタンが最大の要素", async ({ page }) => {
   expect(await biggerThanHero(page)).toEqual([]);
 });
 
+test.describe("2つのタブの復元情報", () => {
+  test.use({ serviceWorkers: "block" });
+  test("古いタブの失効で別タブの新しいアドレスを消さない", async ({ page, context }) => {
+    let respond;
+    const pending = new Promise((resolve) => { respond = resolve; });
+    await page.route("**/messages", (route) => respond(route));
+    await issueAddress(page);
+    const oldPoll = await pending;
+    const second = await context.newPage();
+    await second.goto("/");
+    await expect(second.locator("#address")).toBeVisible();
+    second.once("dialog", (dialog) => dialog.accept());
+    const created = second.waitForResponse((r) => r.url().endsWith("/api/address") && r.status() === 201);
+    await second.locator("#new-address").click();
+    const { address, local } = await (await created).json();
+    await expect(second.locator("#address")).toHaveText(address);
+    // サーバーの削除・新規発行の後で、古いタブが削除済みを知る。
+    await oldPoll.fulfill({ status: 404 });
+    await expect(appMain(page)).toHaveAttribute("data-state", "expired");
+    expect(await second.evaluate(() => JSON.parse(localStorage.getItem("sutemail.v1"))?.local)).toBe(local);
+    await second.reload();
+    await expect(second.locator("#address")).toHaveText(address);
+  });
+});
+
 test("2) 発行すると waiting になり、アドレスをコピーできる", async ({ page }) => {
   const address = await issueAddress(page);
   expect(address.endsWith("@sutemail.test")).toBe(true);

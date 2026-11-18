@@ -164,8 +164,9 @@ function loadStored() {
   return null;
 }
 
-function saveStored(address) {
+function saveStored(address, issued = false) {
   try {
+    if (!issued && loadStored()?.token !== address.token) return;
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -181,8 +182,9 @@ function saveStored(address) {
   }
 }
 
-function clearStored() {
+function clearStored(token = state.address?.token) {
   try {
+    if (loadStored()?.token !== token) return;
     localStorage.removeItem(STORAGE_KEY);
   } catch {
     // 消せなくても実害はない
@@ -256,7 +258,7 @@ async function issue() {
     ui.bodyTexts.clear();
     resetReport();
     resetTurnstile();
-    saveStored(state.address);
+    saveStored(state.address, true);
     state.name = "waiting";
     startPolling();
     refreshPushState();
@@ -1303,7 +1305,7 @@ async function boot() {
     return;
   }
   if (stored.expiresAt <= Date.now()) {
-    clearStored();
+    clearStored(stored.token);
     expiredLocal = stored.local;
     if (state.config?.mailDomain) state.lastAddress = `${expiredLocal}@${state.config.mailDomain}`;
     state.name = "expired";
