@@ -364,23 +364,33 @@ function confirmReplaceAddress() {
  */
 async function replaceAddress() {
   if (state.busy || !state.address) return;
-  const { local, token } = state.address;
+  const address = state.address;
+  state.busy = true;
   stopPolling();
-  // 先に手元の記録を消す。発行に失敗しても、消えたアドレスを掴んだままにしない
+  render(state);
+  try {
+    const response = await fetch(`/api/address/${address.local}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${address.token}` },
+      cache: "no-store",
+    });
+    if (!response.ok && ![404, 410].includes(response.status)) throw new Error("Delete failed");
+  } catch {
+    if (state.address === address) {
+      state.error = "削除を確認できませんでした。「新しいアドレス」からやり直してください。";
+      scheduleNextPoll(pollIntervalMs());
+    }
+    return;
+  } finally {
+    state.busy = false;
+    render(state);
+  }
+  if (state.address !== address) return;
   clearStored();
   state.address = null;
   state.messages = [];
   state.flashMessageId = null;
   state.name = "idle";
-  try {
-    await fetch(`/api/address/${local}`, {
-      method: "DELETE",
-      headers: { authorization: `Bearer ${token}` },
-      cache: "no-store",
-    });
-  } catch {
-    // 消せなくても10分で失効する。次の発行を止める理由にはしない
-  }
   await issue();
 }
 
