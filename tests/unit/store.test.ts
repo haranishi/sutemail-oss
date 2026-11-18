@@ -139,6 +139,29 @@ describe("メッセージ索引（I-2）", () => {
     expect(await getMessage(env.INBOX, local, "msg-9999")).toBeNull();
   });
 
+  it("本文の削除に一度失敗しても、持ち主が DELETE をやり直せる", async () => {
+    await issue();
+    await putMessage(env.INBOX, local, message("sample", Date.now()), 600, 600);
+    const unstable = new Proxy(env.INBOX, {
+      get(target, property) {
+        if (property === "delete") return async (key: string) => {
+          if (key.startsWith("msg:")) throw new Error("temporary KV error");
+          await target.delete(key);
+        };
+        const value = Reflect.get(target, property);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const request = () => new Request(`http://example.com/api/address/${local}`, {
+      method: "DELETE", headers: authHeaders,
+    });
+    await expect(callApi(request(), { INBOX: unstable })).rejects.toThrow("temporary KV error");
+    const retry = await callApi(request());
+    expect(retry.status).toBe(204);
+    expect((await env.INBOX.list({ prefix: `msg:${local}:` })).keys).toEqual([]);
+    expect(await getAddress(env.INBOX, local)).toBeNull();
+  });
+
   it("DELETE は索引から漏れた鍵も list で掃除し、idx: 自身も消す", async () => {
     await issue();
     await putMessage(env.INBOX, local, message("msg-0001", 1_700_000_000_000), 600, 600);

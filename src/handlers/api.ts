@@ -261,7 +261,9 @@ export async function handleApi(request: Request, env: Env): Promise<Response | 
     const auth = await authenticate(request, env, local);
     if (auth instanceof Response) return auth;
     if (request.method === "DELETE") {
-      await Promise.all([deleteAddress(env.INBOX, local), deleteAllMessages(env.INBOX, local)]);
+      // 掃除に失敗したとき、同じ持ち主が DELETE をやり直せるようにする。
+      await deleteAllMessages(env.INBOX, local);
+      await deleteAddress(env.INBOX, local);
       return noContent();
     }
     if (request.method === "GET") {
